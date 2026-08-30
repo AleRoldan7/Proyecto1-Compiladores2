@@ -9,6 +9,50 @@ program:
     ;
 
 seccionEstructuras:
+    SECCION_ESTRUCTURA declaracionEstructura+
+    ;
+
+declaracionEstructura:
+    ESTRUCTURA ID DOS_PUNTOS declaracionVariable+
+    ;
+
+declaracionVariable:
+    tipo ID  dimension? (IGUAL expresion)?
+    ;
+
+dimension:
+    (CORCHETE_ABRE NUMERO_ENTERO CORCHETE_CIERRA)+
+    ;
+tipo:
+    ENTERO
+    | FLOTANTE
+    | CARACTER
+    | BOOL
+    | CADENA
+    | ID
+    ;
+
+expresion:
+    literal
+    | accesoVariable
+    ;
+
+
+literal:
+    NUMERO_ENTERO
+    | DECIMAL
+    | COMILLAS
+    | COMILLASSIMPLES
+    | VERDADERO
+    | FALSO
+    ;
+
+asignacion:
+    accesoVariable IGUAL expresion (PUNTO_COMA)?
+    ;
+
+accesoVariable:
+    ID (PUNTO ID | CORCHETE_ABRE expresion CORCHETE_CIERRA)*
     ;
 
 seccionFunciones:
