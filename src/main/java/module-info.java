@@ -4,7 +4,8 @@ module org.compi2.proyecto1compiladores2 {
 
     requires com.dlsc.formsfx;
     requires org.antlr.antlr4.runtime;
+    requires org.fxmisc.richtext;
 
-    opens org.compi2.proyecto1compiladores2 to javafx.fxml;
-    exports org.compi2.proyecto1compiladores2;
+    opens ui.view to javafx.graphics, javafx.fxml;
+    exports ui.view;
 }

@@ -10,12 +10,14 @@ program:
 
 seccionEstructuras:
     SECCION_ESTRUCTURA declaracionEstructura+
+    | SECCION_ESTRUCTURA condicional
     ;
 
 declaracionEstructura:
     ESTRUCTURA ID DOS_PUNTOS declaracionVariable+
     ;
 
+/*Declaración de variables*/
 declaracionVariable:
     tipo ID  dimension? (IGUAL expresion)?
     ;
@@ -23,6 +25,7 @@ declaracionVariable:
 dimension:
     (CORCHETE_ABRE NUMERO_ENTERO CORCHETE_CIERRA)+
     ;
+
 tipo:
     ENTERO
     | FLOTANTE
@@ -48,11 +51,35 @@ literal:
     ;
 
 asignacion:
-    accesoVariable IGUAL expresion (PUNTO_COMA)?
+    accesoVariable IGUAL expresion
     ;
 
 accesoVariable:
     ID (PUNTO ID | CORCHETE_ABRE expresion CORCHETE_CIERRA)*
+    ;
+
+
+/*Conicional Si*/
+condicional:
+    SI (condicion)+
+    ;
+
+condicion:
+    PARENTESIS_ABRE ID tipoRelacional NUMERO_ENTERO (tipoLogico ID tipoRelacional NUMERO_ENTERO)* PARENTESIS_CIERRA
+    ;
+
+tipoRelacional:
+    MAYOR
+    | MENOR
+    | MAYORIGUAL
+    | MENORIGUAL
+    | COMPARACION
+    | DIFERENCIA
+    ;
+
+tipoLogico:
+    AND
+    | NOT
     ;
 
 seccionFunciones:
@@ -92,7 +119,7 @@ MAYOR: '>';
 
 /*LOGICOS*/
 AND: '&&';
-OR: '||';
+NOT: '||';
 NEGACION: '!';
 
 /*TIPOS DE DATOS*/

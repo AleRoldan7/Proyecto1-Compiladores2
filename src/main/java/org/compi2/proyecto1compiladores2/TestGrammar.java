@@ -10,16 +10,17 @@ public class TestGrammar {
     public static void main(String[] args) {
 
         String codigo = """
-            %estructuras
-            estructura Persona:
-                cadena nombre
-                entero edad = 10
-                entero numeros[10] 
+           %estructuras
+           si(edad > 18)
             """;
 
+
+
         CharStream input = CharStreams.fromString(codigo);
+        //GrammarZetarianoLexer lexer = new GrammarZetarianoLexer(input);
         GrammarPythonLexer lexer = new GrammarPythonLexer(input);
         CommonTokenStream tokens = new CommonTokenStream(lexer);
+        //GrammarZetarianoParser parser = new GrammarZetarianoParser(tokens);
         GrammarPythonParser parser = new GrammarPythonParser(tokens);
         ParseTree tree = parser.program();
         System.out.println(tree.toStringTree(parser));

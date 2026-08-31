@@ -7,9 +7,56 @@ program:
     EOF
     ;
 
-
 creacionClase:
+    PUBLIC CLASS ID LLAVE_ABRE contenidoClase+ LLAVE_CIERRA
     ;
+
+contenidoClase:
+    declaracionVariable
+    | constructor
+    //| metodos
+    ;
+
+declaracionVariable:
+    tipo? ID (IGUAL expresion)? PUNTO_COMA
+    ;
+
+constructor:
+    PUBLIC ID PARENTESIS_ABRE (parametros)? PARENTESIS_CIERRA LLAVE_ABRE declaracionVariable LLAVE_CIERRA
+    ;
+
+
+parametros:
+    parametro (COMA parametro)*
+    ;
+
+parametro:
+    tipo ID
+    ;
+
+tipo:
+    INT
+    | DOUBLE
+    | CHAR
+    | STRING
+    | BOOLEAN
+    | ID
+    ;
+
+expresion:
+    literal
+    ;
+
+literal:
+    ENTERO
+    | DECIMAL
+    | COMILLAS
+    | COMILLASSIMPLES
+    | TRUE
+    | FALSE
+    | ID
+    ;
+
 
 
 
