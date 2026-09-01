@@ -2,6 +2,6 @@ package c3d;
 
 public interface ByteCode {
 
-    String convertirByteCode();
+    void generarC3D(ContextoC3D contexto);
 
 }

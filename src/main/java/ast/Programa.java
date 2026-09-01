@@ -30,4 +30,12 @@ public class Programa extends NodoAST {
         this.funciones = funciones;
         this.declaraciones = declaraciones;
     }
+
+    @Override
+    public String toString() {
+        return "Programa{" +
+                "estructuras=" + estructuras +
+                ", funciones=" + funciones +
+                '}';
+    }
 }
