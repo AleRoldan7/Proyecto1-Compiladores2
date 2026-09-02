@@ -4,6 +4,7 @@ import ast.NodoAST;
 import ast.declaraciones.Parametro;
 import ast.sentencias.Bloque;
 import ast.tipos.Tipo;
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -24,5 +25,10 @@ public class Metodo extends NodoAST {
         this.tipoRetorno = tipoRetorno;
         this.parametros = parametros;
         this.cuerpoMetodo = cuerpoMetodo;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

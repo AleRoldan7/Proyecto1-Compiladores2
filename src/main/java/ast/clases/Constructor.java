@@ -3,6 +3,7 @@ package ast.clases;
 import ast.NodoAST;
 import ast.declaraciones.Parametro;
 import ast.sentencias.Bloque;
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -21,5 +22,10 @@ public class Constructor extends NodoAST {
         this.nombreClase = nombreClase;
         this.parametros = parametros;
         this.cuerpoConstructor = cuerpoConstructor;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

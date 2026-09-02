@@ -1,6 +1,7 @@
 package ast.sentencias;
 
 import ast.expresiones.Expresion;
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -19,5 +20,10 @@ public class CicloFor extends Sentencia {
         this.condicionFor = condicionFor;
         this.incremento = incremento;
         this.bloqueFor = bloqueFor;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

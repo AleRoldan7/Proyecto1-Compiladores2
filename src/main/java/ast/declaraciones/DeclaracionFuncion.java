@@ -2,6 +2,7 @@ package ast.declaraciones;
 
 import ast.sentencias.Bloque;
 import ast.tipos.Tipo;
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -22,5 +23,10 @@ public class DeclaracionFuncion extends Declaracion {
         this.tipoRetorno = tipoRetorno;
         this.parametros = parametros;
         this.cuerpoFuncion = cuerpoFuncion;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+        cuerpoFuncion.generarC3D(contexto);
     }
 }

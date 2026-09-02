@@ -1,6 +1,7 @@
 package ast.sentencias;
 
 import ast.expresiones.Expresion;
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -15,5 +16,10 @@ public class CicloWhile extends Sentencia {
         super(linea, columna);
         this.condicionWhile = condicionWhile;
         this.bloqueWhile = bloqueWhile;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

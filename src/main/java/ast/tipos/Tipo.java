@@ -1,6 +1,7 @@
 package ast.tipos;
 
 import ast.NodoAST;
+import c3d.ContextoC3D;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -20,5 +21,10 @@ public class Tipo extends NodoAST {
         this.nombre = nombre;
         this.arreglo = arreglo;
         this.dimensiones = dimensiones;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

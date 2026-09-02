@@ -2,6 +2,7 @@ package ast.declaraciones;
 
 import ast.expresiones.Expresion;
 import ast.tipos.Tipo;
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -23,5 +24,10 @@ public class DeclaracionArreglo extends Declaracion {
         this.nombre = nombre;
         this.dimensiones = dimensiones;
         this.valorInicial = valorInicial;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

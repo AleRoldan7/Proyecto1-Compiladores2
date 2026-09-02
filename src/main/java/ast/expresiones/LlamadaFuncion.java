@@ -1,5 +1,6 @@
 package ast.expresiones;
 
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,5 +17,10 @@ public class LlamadaFuncion extends Expresion {
         super(linea, columna);
         this.nombre = nombre;
         this.argumentos = argumentos;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

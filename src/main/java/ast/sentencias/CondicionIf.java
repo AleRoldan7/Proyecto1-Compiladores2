@@ -1,6 +1,7 @@
 package ast.sentencias;
 
 import ast.expresiones.Expresion;
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -21,5 +22,10 @@ public class CondicionIf extends Sentencia {
         this.bloqueEntonces = bloqueEntonces;
         this.listaSiNoSi = listaSiNoSi;
         this.bloqueSiNo = bloqueSiNo;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

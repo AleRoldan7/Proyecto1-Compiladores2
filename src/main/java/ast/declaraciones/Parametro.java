@@ -2,6 +2,7 @@ package ast.declaraciones;
 
 import ast.NodoAST;
 import ast.tipos.Tipo;
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -20,5 +21,10 @@ public class Parametro extends NodoAST {
         this.nombreParametro = nombreParametro;
         this.referencia = referencia;
         this.arreglo = arreglo;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

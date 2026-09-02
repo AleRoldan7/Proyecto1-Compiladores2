@@ -1,5 +1,7 @@
 package ast.expresiones;
 
+import c3d.ContextoC3D;
+import enums.TipoDato;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,5 +19,15 @@ public class ExpresionBinaria extends Expresion {
         this.izquierda = izquierda;
         this.operacion = operacion;
         this.derecha = derecha;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+        izquierda.generarC3D(contexto);
+        derecha.generarC3D(contexto);
+
+        String temporal = contexto.nuevoTemporal();
+        contexto.agregarConTipo(operacion, izquierda.getResultado(), derecha.getResultado(), temporal, TipoDato.ENTERO); // parche temporal
+        this.resultado = temporal;
     }
 }

@@ -1,5 +1,6 @@
 package ast.expresiones;
 
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -14,5 +15,10 @@ public class AccesoAtributo extends Expresion {
         super(linea, columna);
         this.objeto = objeto;
         this.atributo = atributo;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

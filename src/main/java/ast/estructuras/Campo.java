@@ -2,6 +2,7 @@ package ast.estructuras;
 
 import ast.NodoAST;
 import ast.tipos.Tipo;
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,5 +17,10 @@ public class Campo extends NodoAST {
         super(linea, columna);
         this.tipo = tipo;
         this.nombre = nombre;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

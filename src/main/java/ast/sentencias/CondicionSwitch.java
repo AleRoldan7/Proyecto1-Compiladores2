@@ -1,6 +1,7 @@
 package ast.sentencias;
 
 import ast.expresiones.Expresion;
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -19,5 +20,10 @@ public class CondicionSwitch extends Sentencia {
         this.expresion = expresion;
         this.casos = casos;
         this.bloqueDefecto = bloqueDefecto;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

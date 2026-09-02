@@ -11,6 +11,7 @@ import ast.estructuras.Estructura;
 import ast.estructuras.InicializacionEstructura;
 import ast.expresiones.Expresion;
 import ast.expresiones.ExpresionBinaria;
+import ast.expresiones.Identificador;
 import ast.expresiones.Literal;
 import ast.sentencias.Bloque;
 import ast.sentencias.CondicionIf;
@@ -206,6 +207,42 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
         return new Bloque(linea(ctx), columna(ctx), sentencias);
     }
 
+    @Override
+    public NodoAST visitSentDeclaracionVariable(GrammarPythonParser.SentDeclaracionVariableContext ctx) {
+        return visit(ctx.declaracionVariable());
+    }
+
+    @Override
+    public NodoAST visitSentAsignacion(GrammarPythonParser.SentAsignacionContext ctx) {
+        return visit(ctx.asignacion());
+    }
+
+    @Override
+    public NodoAST visitSentCondicional(GrammarPythonParser.SentCondicionalContext ctx) {
+        return visit(ctx.condicional());
+    }
+
+    @Override
+    public NodoAST visitSentCicloPara(GrammarPythonParser.SentCicloParaContext ctx) {
+        return visit(ctx.cicloPara());
+    }
+
+    @Override
+    public NodoAST visitSentCicloMientras(GrammarPythonParser.SentCicloMientrasContext ctx) {
+        return visit(ctx.cicloMientras());
+    }
+
+    @Override
+    public NodoAST visitExpAcceso(GrammarPythonParser.ExpAccesoContext ctx) {
+        return visit(ctx.accesoVariable());
+    }
+
+    @Override
+    public NodoAST visitAccesoVariable(GrammarPythonParser.AccesoVariableContext ctx) {
+        // por ahora, solo el caso simple: un identificador suelto (a, total, b)
+        // el acceso compuesto (p1.campo, numeros[i]) lo resolvemos cuando lleguemos a structs/arreglos
+        return new Identificador(linea(ctx), columna(ctx), ctx.ID(0).getText());
+    }
     private Tipo construirTipo(GrammarPythonParser.TipoContext ctx, GrammarPythonParser.DimensionContext dim) {
         return new Tipo(linea(ctx), columna(ctx), ctx.getText(), dim != null, dim != null ? dim.NUMERO_ENTERO().size() : 0);
     }

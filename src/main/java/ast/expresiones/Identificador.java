@@ -1,5 +1,6 @@
 package ast.expresiones;
 
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -12,5 +13,10 @@ public class Identificador extends Expresion {
     public Identificador(int linea, int columna, String nombreIdentificador) {
         super(linea, columna);
         this.nombreIdentificador = nombreIdentificador;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+        this.resultado = nombreIdentificador;
     }
 }

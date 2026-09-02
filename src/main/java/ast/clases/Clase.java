@@ -1,6 +1,7 @@
 package ast.clases;
 
 import ast.NodoAST;
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -21,5 +22,10 @@ public class Clase extends NodoAST {
         this.atributos = atributos;
         this.constructores = constructores;
         this.metodos = metodos;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

@@ -1,5 +1,6 @@
 package ast.expresiones;
 
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,5 +17,10 @@ public class CrearObjeto extends Expresion {
         super(linea, columna);
         this.nombreClase = nombreClase;
         this.argumentos = argumentos;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

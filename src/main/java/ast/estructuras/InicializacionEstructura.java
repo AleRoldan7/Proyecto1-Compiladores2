@@ -1,6 +1,7 @@
 package ast.estructuras;
 
 import ast.expresiones.Expresion;
+import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,5 +18,10 @@ public class InicializacionEstructura extends Expresion {
         super(linea, columna);
         this.nombreTipo = nombreTipo;
         this.valores = valores;
+    }
+
+    @Override
+    public void generarC3D(ContextoC3D contexto) {
+
     }
 }

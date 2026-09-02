@@ -1,11 +1,10 @@
-package utils.generadorC;
+package c3d;
 
-import c3d.Cuarteta;
 import enums.TipoDato;
 
 import java.util.List;
 
-public class GeneradorCodigoC {
+public class GenerarCodigoC {
 
     public String generar(List<Cuarteta> cuartetas) {
         StringBuilder c = new StringBuilder();
@@ -34,7 +33,7 @@ public class GeneradorCodigoC {
 
     private String prefijoTipo(Cuarteta q) {
         if (q.getTipoDeclarado() == null) {
-            return "";
+            return ""; // ya es una variable existente, no se re-declara
         }
         return mapearTipoC(q.getTipoDeclarado()) + " ";
     }
