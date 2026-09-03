@@ -1,0 +1,6 @@
+Se mejoro la interfaz de usuario, ya funciona el árbol de trabajo para agregar carpetas, archivos individuales, guardar y descargar proyectos, falta mejorar para crear carpetas para trabajar y descargarlas
+
+Se realizo el primer avance del visitor del zetariano y piton, teniendo en cuenta que es la primer prueba aún falta validar muchas cosas sintacticas de los lenguajes
+
+Empezar con el analisis semantico de los lenguajes
+Generación de C3D en Piton ya puede validar funciones sencillas
