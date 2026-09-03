@@ -11,6 +11,10 @@ public class AppPrincipal extends Application {
 
         MainView mainView = new MainView();
         Scene scene = new Scene(mainView,1200,700);
+
+        scene.getStylesheets().add(getClass().getResource("/pintar/colores.css").toExternalForm());
+
+
         stage.setTitle("Código 3 direcciones");
         stage.setScene(scene);
         stage.show();

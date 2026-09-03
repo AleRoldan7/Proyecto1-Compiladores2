@@ -3,9 +3,15 @@ grammar GrammarPigLatin;
 /*GRAMATICA*/
 
 program:
+    seccionImport
     seccionVariables?
-    seccionMain
+    seccionMain?
     EOF
+    ;
+
+/*SINTAXIS SECCION IMPORT*/
+seccionImport:
+    IMPORT ID PUNTO ID (PUNTO ID)* PUNTO ID
     ;
 
 /*SINTAXIS SECCION VARIABLES*/

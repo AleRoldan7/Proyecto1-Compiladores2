@@ -26,7 +26,7 @@ public class GeneradorC3DTest {
                 definir sumar():
                 	entero a = 5
                 	entero b = 3
-                	entero total = a + b
+                	entero total = a + b	
                 """;
 
         //System.out.println("===== CÓDIGO FUENTE =====");
@@ -104,7 +104,7 @@ public class GeneradorC3DTest {
         int codigoSalidaGcc = compilacion.waitFor();
 
         System.out.println("\n===== SALIDA DE GCC =====");
-        System.out.println(salidaGcc.isBlank() ? "(sin errores) ✅ compiló" : salidaGcc);
+        System.out.println(salidaGcc.isBlank() ? "(sin errores)  compiló" : salidaGcc);
 
         if (codigoSalidaGcc == 0) {
             Process ejecucion = new ProcessBuilder("./salida_prueba").redirectErrorStream(true).start();

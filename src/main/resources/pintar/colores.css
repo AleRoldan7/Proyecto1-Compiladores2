@@ -1,0 +1,87 @@
+.seccion {
+    -fx-fill: #D9A15C; /* ámbar, igual que el acento principal del editor */
+    -fx-font-weight: bold;
+}
+.variable {
+    -fx-fill: #4FD1C5; /* verde-azulado */
+    -fx-font-weight: bold;
+}
+.tipo {
+    -fx-fill: #7FB0FF; /* azul suave */
+    -fx-font-weight: bold;
+}
+.numero {
+    -fx-fill: #E0A83C; /* ámbar más claro */
+}
+.boolean {
+    -fx-fill: #C98BE0; /* lila suave */
+}
+.cadena {
+    -fx-fill: #7ED08A; /* verde suave */
+}
+.operador {
+    -fx-fill: #ECECEC; /* texto claro, no negro (ya no hay fondo blanco) */
+}
+.condicional {
+    -fx-fill: #E05260; /* rojo suave */
+    -fx-font-weight: bold;
+}
+.ciclo {
+    -fx-fill: #4FD1C5;
+    -fx-font-weight: bold;
+}
+.funcion {
+    -fx-fill: #C98BE0;
+    -fx-font-weight: bold;
+}
+.default {
+    -fx-fill: #ECECEC;
+}
+
+.reportes-tabs .tab-header-background {
+    -fx-background-color: #1A1A1A;
+}
+.reportes-tabs .tab {
+    -fx-background-color: #1E1E1E;
+    -fx-background-radius: 6 6 0 0;
+}
+.reportes-tabs .tab:selected {
+    -fx-background-color: #2A2A2A;
+}
+.reportes-tabs .tab-label {
+    -fx-text-fill: #9A9A9A;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+.reportes-tabs .tab:selected .tab-label {
+    -fx-text-fill: #D9A15C;
+}
+
+.simbolos-tabs .tab-header-background {
+    -fx-background-color: #1A1A1A;
+}
+.simbolos-tabs .tab {
+    -fx-background-color: #1E1E1E;
+    -fx-background-radius: 6 6 0 0;
+}
+.simbolos-tabs .tab:selected {
+    -fx-background-color: #2A2A2A;
+}
+.simbolos-tabs .tab-label {
+    -fx-text-fill: #9A9A9A;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+.simbolos-tabs .tab:selected .tab-label {
+    -fx-text-fill: #D9A15C;
+}
+
+.code-area {
+    -fx-background-color: #141414;
+    -fx-text-fill: #ECECEC;
+}
+
+.code-area .caret {
+    -fx-stroke: #D9A15C;
+    -fx-stroke-width: 2px;
+}
