@@ -4,3 +4,9 @@ Se realizo el primer avance del visitor del zetariano y piton, teniendo en cuent
 
 Empezar con el analisis semantico de los lenguajes
 Generación de C3D en Piton ya puede validar funciones sencillas
+
+06-09-2026
+Se avanzo con la mejora en la compilación de los tres lenguajes que se manejaran ya se analizan al mismo tiempo, mejoras en la vista para trabajar y que los archivos se puedan ver por pestañas en el panel principal, primer avance con la vista para el
+manejo de errores.
+
+EMPEZAR YA CON EL ANALISIS SEMANTICO AUNQUE HAY QUE CORREGIR COSAS SINTACITICAS DE LOS TRES LENGUAJES, TAMBIEN CORREGIR EL MANEJO DE LAS TABULACIONES EN EL CODIGO .Y DE PITON 
