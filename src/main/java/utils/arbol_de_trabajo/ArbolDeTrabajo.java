@@ -1,9 +1,8 @@
 package utils.arbol_de_trabajo;
 
-import javafx.geometry.Insets;
+import enums.TipoArchivo;
 import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -14,6 +13,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -29,13 +29,20 @@ public class ArbolDeTrabajo extends BorderPane {
     private OnArchivoAbierto listener;
 
     public ArbolDeTrabajo() {
-        //setTop(construirBarraHerramientas());
         configurarArbol();
         setCenter(arbol);
     }
 
     public void setOnArchivoAbierto(OnArchivoAbierto listener) {
         this.listener = listener;
+    }
+
+    public File getCarpetaRaiz() {
+        return carpetaRaiz;
+    }
+
+    public File getArchivoActual() {
+        return archivoActual;
     }
 
     /**
@@ -45,9 +52,55 @@ public class ArbolDeTrabajo extends BorderPane {
         if (archivoActual == null) {
             throw new IllegalStateException("No hay un archivo activo. Usa 'Guardar como'.");
         }
-        Files.writeString(archivoActual.toPath(), contenido, StandardCharsets.UTF_8);
+        guardarArchivo(archivoActual, contenido);
     }
 
+    /** Guarda un archivo puntual (usado cuando hay varias pestañas abiertas). */
+    public void guardarArchivo(File archivo, String contenido) throws IOException {
+        Files.writeString(archivo.toPath(), contenido, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Busca dentro de la carpeta del proyecto (o junto al archivo suelto
+     * abierto, si no hay carpeta) los archivos .y, .z y .pig, agrupados por
+     * tipo. Necesario para poder compilar los 3 lenguajes a la vez.
+     */
+    public Map<TipoArchivo, List<File>> localizarArchivosDelProyecto() {
+        Map<TipoArchivo, List<File>> resultado = new EnumMap<>(TipoArchivo.class);
+        resultado.put(TipoArchivo.Y_INTERROGACION, new ArrayList<>());
+        resultado.put(TipoArchivo.ZETARIANO, new ArrayList<>());
+        resultado.put(TipoArchivo.PIG_LATIN, new ArrayList<>());
+
+        File base = carpetaRaiz != null ? carpetaRaiz
+                : (archivoActual != null ? archivoActual.getParentFile() : null);
+
+        if (base != null && base.isDirectory()) {
+            recorrerYClasificar(base, resultado);
+        } else if (archivoActual != null) {
+            TipoArchivo tipo = TipoArchivo.porArchivo(archivoActual);
+            if (tipo != TipoArchivo.DESCONOCIDO) {
+                resultado.get(tipo).add(archivoActual);
+            }
+        }
+
+        return resultado;
+    }
+
+    private void recorrerYClasificar(File carpeta, Map<TipoArchivo, List<File>> resultado) {
+        File[] hijos = carpeta.listFiles();
+        if (hijos == null) return;
+
+        for (File hijo : hijos) {
+            if (hijo.isDirectory()) {
+                recorrerYClasificar(hijo, resultado);
+            } else {
+                TipoArchivo tipo = TipoArchivo.porArchivo(hijo);
+                if (tipo != TipoArchivo.DESCONOCIDO) {
+                    resultado.get(tipo).add(hijo);
+                }
+            }
+        }
+    }
 
     private void configurarArbol() {
         arbol.setShowRoot(true);
@@ -121,11 +174,6 @@ public class ArbolDeTrabajo extends BorderPane {
         if (destino != null) {
             archivoActual = destino;
             // El contenido real lo escribe MainView llamando a guardarArchivoActual(...)
-            if (listener != null) {
-                // avisamos con contenido vacío solo para que MainView sepa
-                // que hay un nuevo archivo activo; el guardado real lo hace
-                // MainView al invocar guardarArchivoActual con el texto del editor.
-            }
         }
     }
 

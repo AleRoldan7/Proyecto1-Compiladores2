@@ -1,7 +1,8 @@
 package ui.view;
 
-import analisis.CompiladorCodigo;
-import analisis.ResultadoAnalisis;
+import analisis.CompiladorProyecto;
+import analisis.ResultadoProyecto;
+import enums.TipoArchivo;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -11,26 +12,39 @@ import javafx.scene.layout.*;
 import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.LineNumberFactory;
 import tablas.FilaTabla;
+import ui.button_option.ConsolaErrores;
 import ui.button_option.TablaSimbolosView;
 import utils.arbol_de_trabajo.ArbolDeTrabajo;
 import utils.coloreado.SintaxColoreado;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MainView extends BorderPane {
 
     private HBox menu;
-    private CodeArea codeArea;
+    private TabPane editorTabs;
     private SplitPane root;
     private StackPane contenido;
     private Label insigniaEstado;
+    private Label indicadorPosicion;
 
     private final ArbolDeTrabajo arbolDeTrabajo = new ArbolDeTrabajo();
 
-    private final CompiladorCodigo compiladorCodigo = new CompiladorCodigo();
-    private ResultadoAnalisis resultadoAnalisis;
+    private final CompiladorProyecto compiladorProyecto = new CompiladorProyecto();
+    private ResultadoProyecto resultadoProyecto;
+    private final ConsolaErrores consolaErrores = new ConsolaErrores();
 
-    private SintaxColoreado sintaxColoreado;
+    /** Una pestaña por archivo abierto, para poder tener los 3 lenguajes a la vista al mismo tiempo. */
+    private final Map<File, Tab> pestanasPorArchivo = new HashMap<>();
+    /** Último mapa de archivos del proyecto usado para compilar (nombre -> File), para poder navegar desde la consola. */
+    private final Map<String, File> archivosProyectoPorNombre = new HashMap<>();
+
     // ---- Paleta (misma que Codex Latinus) ----
     private static final String FONDO = "#121212";
     private static final String SUPERFICIE = "#1A1A1A";
@@ -47,8 +61,10 @@ public class MainView extends BorderPane {
         menuCreado();
         contenidoCentral();
 
-        arbolDeTrabajo.setOnArchivoAbierto((archivo, contenidoTexto) -> codeArea.replaceText(contenidoTexto));
+        arbolDeTrabajo.setOnArchivoAbierto((archivo, contenidoTexto) -> abrirOFocalizarPestana(archivo, contenidoTexto));
         estilizarArbol();
+
+        consolaErrores.setOnNavegar(this::navegarAError);
 
         setTop(menu);
         setLeft(arbolDeTrabajo);
@@ -101,15 +117,17 @@ public class MainView extends BorderPane {
         MenuItem guardar = new MenuItem("Guardar");
         MenuItem guardarComo = new MenuItem("Guardar Como");
         MenuItem descargar = new MenuItem("Descargar");
+        MenuItem cerrarPestana = new MenuItem("Cerrar pestaña");
 
         buttonArchivo.getItems().addAll(
                 nuevo, new SeparatorMenuItem(),
                 abrir, carpeta, new SeparatorMenuItem(),
                 guardar, guardarComo, new SeparatorMenuItem(),
-                descargar
+                descargar, new SeparatorMenuItem(),
+                cerrarPestana
         );
 
-        nuevo.setOnAction(e -> codeArea.clear());
+        nuevo.setOnAction(e -> crearPestanaSinTitulo());
 
         abrir.setOnAction(e -> {
             try {
@@ -129,15 +147,7 @@ public class MainView extends BorderPane {
             }
         });
 
-        guardar.setOnAction(e -> {
-            try {
-                arbolDeTrabajo.guardarArchivoActual(codeArea.getText());
-                mostrarEstado("Guardado", EXITO);
-            } catch (Exception ex) {
-                mostrarError("No se pudo guardar");
-                ex.printStackTrace();
-            }
-        });
+        guardar.setOnAction(e -> guardarPestanaActiva());
 
         guardarComo.setOnAction(e -> {
             try {
@@ -159,16 +169,23 @@ public class MainView extends BorderPane {
             }
         });
 
-        Button buttonCompilar = new Button("Compilar");
+        cerrarPestana.setOnAction(e -> {
+            Tab activa = editorTabs.getSelectionModel().getSelectedItem();
+            if (activa != null) {
+                editorTabs.getTabs().remove(activa);
+            }
+        });
+
+        Button buttonCompilarProyecto = new Button("Compilar Proyecto");
         Button buttonSimbolos = new Button("Tabla Símbolos");
         Button buttonC3d = new Button("Generar C3D");
 
         estilizarBoton(buttonArchivo);
-        estilizarBotonPrincipal(buttonCompilar);
+        estilizarBotonPrincipal(buttonCompilarProyecto);
         estilizarBoton(buttonSimbolos);
         estilizarBoton(buttonC3d);
 
-        buttonCompilar.setOnAction(e -> onCompilar());
+        buttonCompilarProyecto.setOnAction(e -> onCompilarProyecto());
         buttonSimbolos.setOnAction(e -> onMostrarSimbolos());
         buttonC3d.setOnAction(e -> onGenerarC3D());
 
@@ -180,34 +197,21 @@ public class MainView extends BorderPane {
 
         menu.getChildren().addAll(
                 tituloBox, separador,
-                buttonArchivo, buttonCompilar, buttonSimbolos, buttonC3d,
+                buttonArchivo, buttonCompilarProyecto, buttonSimbolos, buttonC3d,
                 espaciador, insigniaEstado
         );
     }
 
     // ============================================================
-    //  EDITOR + PANEL DE RESULTADOS
+    //  EDITOR (MULTI-PESTAÑA) + PANEL DE RESULTADOS
     // ============================================================
     private void contenidoCentral() {
-        codeArea = new CodeArea();
-        codeArea.setWrapText(false);
-        codeArea.setParagraphGraphicFactory(LineNumberFactory.get(codeArea));
+        editorTabs = new TabPane();
+        editorTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
+        editorTabs.setStyle("-fx-background-color: " + SUPERFICIE + ";");
 
-        sintaxColoreado = new SintaxColoreado(codeArea);
-
-        codeArea.setStyle(
-                "-fx-font-family: 'Consolas', 'Courier New', monospace;" +
-                        "-fx-font-size: 14px;" +
-                        "-fx-control-inner-background: #141414;" +
-                        "-fx-background-color: #141414;" +
-                        "-fx-text-fill: " + TEXTO + ";" +
-                        "-fx-highlight-fill: #3A2F1D;" +
-                        "-fx-highlight-text-fill: " + PRIMARIO + ";" +
-                        "-fx-caret-color: " + PRIMARIO + ";"
-        );
-
-        // ---- Barra inferior: posicion + ir a linea ----
-        Label indicadorPosicion = new Label("Línea 1, Columna 1");
+        // ---- Barra inferior: posicion + ir a linea (aplica a la pestaña activa) ----
+        indicadorPosicion = new Label("Línea 1, Columna 1");
         indicadorPosicion.setPadding(new Insets(5, 12, 5, 12));
         indicadorPosicion.setStyle(
                 "-fx-background-color: " + PANEL + ";" +
@@ -247,9 +251,6 @@ public class MainView extends BorderPane {
         });
         botonIrLinea.setOnAction(e -> irALinea(campoLinea));
 
-        codeArea.caretPositionProperty().addListener((obs, anterior, nuevaPos) ->
-                actualizarIndicadorPosicion(indicadorPosicion, nuevaPos.intValue()));
-
         HBox barraInferior = new HBox(8, indicadorPosicion, textoIrLinea, campoLinea, botonIrLinea);
         barraInferior.setAlignment(Pos.CENTER_LEFT);
         barraInferior.setPadding(new Insets(5, 8, 5, 8));
@@ -259,8 +260,8 @@ public class MainView extends BorderPane {
                         "-fx-border-width: 1 0 0 0;"
         );
 
-        VBox columnaEditor = new VBox(codeArea, barraInferior);
-        VBox.setVgrow(codeArea, Priority.ALWAYS);
+        VBox columnaEditor = new VBox(editorTabs, barraInferior);
+        VBox.setVgrow(editorTabs, Priority.ALWAYS);
         columnaEditor.setFillWidth(true);
         columnaEditor.setStyle(
                 "-fx-background-color: " + SUPERFICIE + ";" +
@@ -268,7 +269,7 @@ public class MainView extends BorderPane {
                         "-fx-border-width: 0 1 0 0;"
         );
 
-        // ---- Panel de resultados (tabla simbolos, cuartetas, etc.) ----
+        // ---- Panel de resultados (tabla simbolos, cuartetas, consola de errores, etc.) ----
         contenido = new StackPane();
         Label placeholder = new Label("Codex Latinus");
         placeholder.setStyle(
@@ -294,6 +295,14 @@ public class MainView extends BorderPane {
         root.setStyle("-fx-background-color: " + FONDO + "; -fx-box-border: transparent;");
         SplitPane.setResizableWithParent(columnaEditor, true);
         SplitPane.setResizableWithParent(contenidoConMargen, true);
+
+        // Cuando cambia la pestaña activa, el indicador de línea/columna sigue a esa pestaña
+        editorTabs.getSelectionModel().selectedItemProperty().addListener((obs, anterior, actual) -> {
+            if (actual != null) {
+                PestanaEditor datos = (PestanaEditor) actual.getUserData();
+                actualizarIndicadorPosicion(indicadorPosicion, datos.area.getCaretPosition());
+            }
+        });
     }
 
     private void estilizarArbol() {
@@ -308,155 +317,204 @@ public class MainView extends BorderPane {
     }
 
     // ============================================================
-    //  ACCIONES DE COMPILACION
+    //  PESTAÑAS DEL EDITOR
     // ============================================================
-    private void onCompilar() {
 
-        String codigo = codeArea.getText();
-        if (codigo == null || codigo.isBlank()) {
+    /** Guarda la referencia al archivo (si tiene) junto con su CodeArea. */
+    private static class PestanaEditor {
+        File archivo; // null si es una pestaña "Sin título"
+        final CodeArea area;
 
-            mostrarError("El código está vacío");
+        PestanaEditor(File archivo, CodeArea area) {
+            this.archivo = archivo;
+            this.area = area;
+        }
+    }
+
+    private void abrirOFocalizarPestana(File archivo, String contenidoTexto) {
+        Tab existente = pestanasPorArchivo.get(archivo);
+        if (existente != null) {
+            editorTabs.getSelectionModel().select(existente);
             return;
         }
 
-        mostrarEstado("Analizando...", TEXTO_SECUNDARIO);
+        CodeArea area = crearCodeArea();
+        area.replaceText(contenidoTexto);
 
-        try {
+        Tab tab = new Tab(archivo.getName());
+        tab.setUserData(new PestanaEditor(archivo, area));
+        tab.setContent(area);
+        tab.setOnCloseRequest(e -> pestanasPorArchivo.remove(archivo));
 
-            resultadoAnalisis =
-                    compiladorCodigo.analizar(codigo);
+        pestanasPorArchivo.put(archivo, tab);
+        editorTabs.getTabs().add(tab);
+        editorTabs.getSelectionModel().select(tab);
+    }
 
-            if (resultadoAnalisis.isCorrecto()) {
+    private void crearPestanaSinTitulo() {
+        CodeArea area = crearCodeArea();
+        Tab tab = new Tab("Sin título");
+        tab.setUserData(new PestanaEditor(null, area));
+        tab.setContent(area);
+        editorTabs.getTabs().add(tab);
+        editorTabs.getSelectionModel().select(tab);
+    }
 
-                mostrarEstado(
-                        "✓ Análisis correcto",
-                        EXITO
-                );
+    private CodeArea crearCodeArea() {
+        CodeArea area = new CodeArea();
+        area.setWrapText(false);
+        area.setParagraphGraphicFactory(LineNumberFactory.get(area));
+        new SintaxColoreado(area); // coloreado en tiempo real, uno por pestaña
 
-                mostrarResultadoCorrecto();
+        area.setStyle(
+                "-fx-font-family: 'Consolas', 'Courier New', monospace;" +
+                        "-fx-font-size: 14px;" +
+                        "-fx-control-inner-background: #141414;" +
+                        "-fx-background-color: #141414;" +
+                        "-fx-text-fill: " + TEXTO + ";" +
+                        "-fx-highlight-fill: #3A2F1D;" +
+                        "-fx-highlight-text-fill: " + PRIMARIO + ";" +
+                        "-fx-caret-color: " + PRIMARIO + ";"
+        );
 
-            } else {
-
-                mostrarEstado(
-                        "✗ Se encontraron errores",
-                        ERROR
-                );
-
-                mostrarErrores();
-
+        area.caretPositionProperty().addListener((obs, anterior, nuevaPos) -> {
+            Tab activa = editorTabs.getSelectionModel().getSelectedItem();
+            if (activa != null && ((PestanaEditor) activa.getUserData()).area == area) {
+                actualizarIndicadorPosicion(indicadorPosicion, nuevaPos.intValue());
             }
+        });
 
-        } catch (Exception ex) {
+        return area;
+    }
 
-            mostrarError(
-                    "Error interno durante el análisis"
-            );
+    private PestanaEditor pestanaActiva() {
+        Tab tab = editorTabs.getSelectionModel().getSelectedItem();
+        return tab == null ? null : (PestanaEditor) tab.getUserData();
+    }
 
+    private void guardarPestanaActiva() {
+        PestanaEditor activa = pestanaActiva();
+        if (activa == null) {
+            mostrarError("No hay ninguna pestaña abierta");
+            return;
+        }
+        if (activa.archivo == null) {
+            try {
+                arbolDeTrabajo.guardarComo();
+                mostrarEstado("Usa 'Guardar Como' para archivos sin título todavía", TEXTO_SECUNDARIO);
+            } catch (Exception ex) {
+                mostrarError("No se pudo guardar");
+            }
+            return;
+        }
+        try {
+            arbolDeTrabajo.guardarArchivo(activa.archivo, activa.area.getText());
+            mostrarEstado("Guardado", EXITO);
+        } catch (IOException ex) {
+            mostrarError("No se pudo guardar");
             ex.printStackTrace();
         }
     }
-    private void mostrarResultadoCorrecto() {
 
-        VBox panel = new VBox(15);
+    // ============================================================
+    //  ACCIONES DE COMPILACION (LOS 3 ARCHIVOS A LA VEZ)
+    // ============================================================
+    private void onCompilarProyecto() {
 
-        panel.setPadding(new Insets(20));
+        Map<TipoArchivo, List<File>> archivosPorTipo = arbolDeTrabajo.localizarArchivosDelProyecto();
 
-        Label titulo = new Label("Análisis completado");
-
-        titulo.setStyle(
-                "-fx-text-fill: " + TEXTO + ";" +
-                        "-fx-font-size: 20px;" +
-                        "-fx-font-weight: bold;"
-        );
-
-
-        Label estado = new Label(
-                "El código no contiene errores."
-        );
-
-        estado.setStyle(
-                "-fx-text-fill: " + EXITO + ";" +
-                        "-fx-font-size: 14px;"
-        );
-
-
-        Label ast = new Label(
-                "AST generado correctamente."
-        );
-
-        ast.setStyle(
-                "-fx-text-fill: " + TEXTO_SECUNDARIO + ";"
-        );
-
-
-        panel.getChildren().addAll(
-                titulo,
-                estado,
-                ast
-        );
-
-        mostrarVista(panel);
-    }
-
-    private void mostrarErrores() {
-
-        VBox panel = new VBox(10);
-
-        panel.setPadding(new Insets(20));
-
-        Label titulo = new Label(
-                "Errores de compilación"
-        );
-
-        titulo.setStyle(
-                "-fx-text-fill: " + ERROR + ";" +
-                        "-fx-font-size: 18px;" +
-                        "-fx-font-weight: bold;"
-        );
-
-
-        ListView<String> listaErrores =
-                new ListView<>();
-
-        listaErrores.getItems().addAll(
-                resultadoAnalisis.getErrores()
-        );
-
-
-        listaErrores.setStyle(
-                "-fx-background-color: " + PANEL + ";" +
-                        "-fx-control-inner-background: " + PANEL + ";" +
-                        "-fx-text-fill: " + TEXTO + ";"
-        );
-
-
-        VBox.setVgrow(
-                listaErrores,
-                Priority.ALWAYS
-        );
-
-
-        panel.getChildren().addAll(
-                titulo,
-                listaErrores
-        );
-
-        mostrarVista(panel);
-    }
-    private void onMostrarSimbolos() {
-        if (resultadoAnalisis == null) {
-
-            mostrarError(
-                    "Primero debes compilar el código"
-            );
-
+        boolean hayAlgunArchivo = archivosPorTipo.values().stream().anyMatch(l -> !l.isEmpty());
+        if (!hayAlgunArchivo) {
+            mostrarError("Abre una carpeta (o al menos un archivo .y/.z/.pig) primero");
             return;
         }
 
-        TablaSimbolosView tabla =
-                new TablaSimbolosView();
+        // Recordamos el mapeo nombre -> File para poder navegar desde la consola de errores
+        archivosProyectoPorNombre.clear();
+        archivosPorTipo.values().forEach(lista ->
+                lista.forEach(f -> archivosProyectoPorNombre.put(f.getName(), f)));
 
-        tabla.actualizar((List<FilaTabla>) resultadoAnalisis.getTablaSimbolos());
+        mostrarEstado("Analizando los 3 archivos...", TEXTO_SECUNDARIO);
+
+        try {
+            resultadoProyecto = compiladorProyecto.compilar(archivosPorTipo, this::obtenerContenidoDe);
+
+            consolaErrores.mostrarErrores(resultadoProyecto.getErrores());
+            mostrarVista(consolaErrores);
+
+            if (resultadoProyecto.isCorrecto()) {
+                mostrarEstado("✓ Los 3 archivos compilan correctamente", EXITO);
+            } else {
+                mostrarEstado("✗ Se encontraron errores", ERROR);
+            }
+
+        } catch (Exception ex) {
+            mostrarError("Error interno durante el análisis del proyecto");
+            ex.printStackTrace();
+        }
+    }
+
+    /** Si el archivo está abierto en una pestaña, usa ese texto (aunque no esté guardado); si no, lo lee de disco. */
+    private String obtenerContenidoDe(File archivo) {
+        Tab tab = pestanasPorArchivo.get(archivo);
+        if (tab != null) {
+            return ((PestanaEditor) tab.getUserData()).area.getText();
+        }
+        try {
+            return Files.readString(archivo.toPath(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new RuntimeException("No se pudo leer " + archivo.getName(), e);
+        }
+    }
+
+    /** Doble clic en una fila de la consola: abre (o enfoca) el archivo y salta a la línea. */
+    private void navegarAError(String nombreArchivo, int linea) {
+        File archivo = archivosProyectoPorNombre.get(nombreArchivo);
+        if (archivo == null) return;
+
+        if (!pestanasPorArchivo.containsKey(archivo)) {
+            try {
+                String contenido = Files.readString(archivo.toPath(), StandardCharsets.UTF_8);
+                abrirOFocalizarPestana(archivo, contenido);
+            } catch (IOException e) {
+                mostrarError("No se pudo abrir " + nombreArchivo);
+                return;
+            }
+        } else {
+            editorTabs.getSelectionModel().select(pestanasPorArchivo.get(archivo));
+        }
+
+        PestanaEditor activa = pestanaActiva();
+        if (activa != null && linea > 0) {
+            moverCursorALinea(activa.area, linea);
+        }
+    }
+
+    private void moverCursorALinea(CodeArea area, int linea) {
+        String texto = area.getText();
+
+        String[] lineas = texto.split("\\R", -1);
+
+        int lineaObjetivo = Math.max(
+                1,
+                Math.min(linea, lineas.length)
+        );
+
+        int posicion = area.position(lineaObjetivo - 1, 0).toOffset();
+
+        area.moveTo(posicion);
+        area.showParagraphAtTop(Math.max(0, lineaObjetivo - 2));
+        area.requestFocus();
+    }
+
+    private void onMostrarSimbolos() {
+        if (resultadoProyecto == null) {
+            mostrarError("Primero debes compilar el proyecto");
+            return;
+        }
+
+        TablaSimbolosView tabla = new TablaSimbolosView();
+        tabla.actualizar((List<FilaTabla>) resultadoProyecto.getContexto().getTablaSimbolos().getHistorialTabla());
 
         mostrarVista(tabla);
     }
@@ -567,7 +625,10 @@ public class MainView extends BorderPane {
     //  UTILIDADES DEL EDITOR
     // ============================================================
     private void actualizarIndicadorPosicion(Label indicador, int posicionCursor) {
-        String texto = codeArea.getText();
+        PestanaEditor activa = pestanaActiva();
+        if (activa == null) return;
+
+        String texto = activa.area.getText();
         int limite = Math.min(posicionCursor, texto.length());
         int linea = 1;
         int inicioLineaActual = 0;
@@ -583,41 +644,29 @@ public class MainView extends BorderPane {
     }
 
     private void irALinea(TextField campoLinea) {
+        PestanaEditor activa = pestanaActiva();
+        if (activa == null) return;
+
         try {
             int linea = Integer.parseInt(campoLinea.getText().trim());
-            String texto = codeArea.getText();
-            int totalLineas = 1;
-            for (int i = 0; i < texto.length(); i++) {
-                if (texto.charAt(i) == '\n') totalLineas++;
-            }
-
-            if (linea < 1 || linea > totalLineas) {
-                estilizarCampoLinea(campoLinea, ERROR);
-                return;
-            }
-
-            int posicion = 0;
-            int lineaActual = 1;
-            while (lineaActual < linea && posicion < texto.length()) {
-                if (texto.charAt(posicion) == '\n') lineaActual++;
-                posicion++;
-            }
-
-            codeArea.moveTo(posicion);
-            codeArea.showParagraphAtTop(linea - 1);
-            codeArea.requestFocus();
+            moverCursorALinea(activa.area, linea);
             estilizarCampoLinea(campoLinea, BORDE);
-
         } catch (NumberFormatException ex) {
             estilizarCampoLinea(campoLinea, ERROR);
         }
     }
 
     public String getCodigo() {
-        return codeArea.getText();
+        PestanaEditor activa = pestanaActiva();
+        return activa == null ? "" : activa.area.getText();
     }
 
     public void setCodigoEnEditor(String texto) {
-        codeArea.replaceText(texto);
+        PestanaEditor activa = pestanaActiva();
+        if (activa == null) {
+            crearPestanaSinTitulo();
+            activa = pestanaActiva();
+        }
+        activa.area.replaceText(texto);
     }
 }
