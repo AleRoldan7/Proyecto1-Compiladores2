@@ -44,7 +44,7 @@ public class CompiladorArchivo {
                 parser.addErrorListener(new RecolectorErrores(contexto, RecolectorErrores.Etapa.SINTACTICO));
 
                 var arbol = parser.program();
-                return ejecutarVisitor(() -> new VisitorPiton().visit(arbol), contexto);
+                return ejecutarVisitor(() -> new VisitorPiton(contexto).visit(arbol), contexto);
             }
 
             case ZETARIANO: {

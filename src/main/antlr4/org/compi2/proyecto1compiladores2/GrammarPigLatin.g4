@@ -1,44 +1,52 @@
 grammar GrammarPigLatin;
 
-/*GRAMATICA*/
+/* =========================================================
+   ======================= PARSER ==========================
+   ========================================================= */
+
+/* PROGRAMA */
 
 program:
-    seccionImport
+    seccionImport+
     seccionVariables?
-    seccionMain?
+    seccionMain
     EOF
     ;
 
-/*SINTAXIS SECCION IMPORT*/
+/* =========================================================
+   IMPORTACIONES
+   ========================================================= */
+
 seccionImport:
-    IMPORT ID PUNTO ID (PUNTO ID)* PUNTO ID
+    IMPORT ID (PUNTO ID)* PUNTO ID PUNTO_COMA?
     ;
 
-/*SINTAXIS SECCION VARIABLES*/
+/* =========================================================
+   SECCION DE VARIABLES
+   ========================================================= */
+
 seccionVariables:
     SECCIONVARIABLE MAYOR declaracion+
     ;
 
-
 declaracion:
     declaracionVariable
     | declaracionArreglo
-    | declaracionStruct
-
     ;
+
+/* =========================================================
+   DECLARACION DE VARIABLES
+   ========================================================= */
 
 declaracionVariable:
-    ESTO ID DOSPUNTOS tipo (expresion | inicializacionStruct)? PUNTO_COMA?
-    ;
-
-declaracionStruct:
-    ESTRUCTURA ID LLAVE_ABRE contenidoStruct ((COMA | PUNTO_COMA) contenidoStruct)* (COMA | PUNTO_COMA)? LLAVE_CIERRA FINIS PUNTO_COMA
-    ;
-
-contenidoStruct:
     ESTO ID DOSPUNTOS tipo
-    | SERIES ID DOSPUNTOS tipo
+    (expresion | inicializacionStruct)?
+    PUNTO_COMA?
     ;
+
+/* =========================================================
+   TIPOS
+   ========================================================= */
 
 tipo:
     tipoDato
@@ -53,9 +61,18 @@ tipoDato:
     | BOOL
     ;
 
+/* =========================================================
+   DECLARACION DE ARREGLOS
+   ========================================================= */
 
 declaracionArreglo:
-    SERIES ID CORCHETE_ABRE ENTERO CORCHETE_CIERRA DOSPUNTOS tipo (LLAVE_ABRE listaValoresArreglo? LLAVE_CIERRA)? PUNTO_COMA
+    SERIES ID
+    CORCHETE_ABRE ENTERO CORCHETE_CIERRA
+    DOSPUNTOS tipo
+    (
+        LLAVE_ABRE listaValoresArreglo? LLAVE_CIERRA
+    )?
+    PUNTO_COMA
     ;
 
 listaValoresArreglo:
@@ -67,20 +84,49 @@ valorArreglo:
     | inicializacionStruct
     ;
 
+/* =========================================================
+   INICIALIZACION DE ESTRUCTURAS
+   ========================================================= */
+
+/*
+   Ejemplo:
+
+   esto ciudadano : Persona {
+       "Valeria",
+       25,
+       {
+           "Avenida Central",
+           500
+       }
+   };
+*/
 
 inicializacionStruct:
-    LLAVE_ABRE asignacionCampo (COMA asignacionCampo)* LLAVE_CIERRA
+    LLAVE_ABRE listaValoresInicializacion? LLAVE_CIERRA
     ;
 
-asignacionCampo:
-    ID DOSPUNTOS (expresion | inicializacionStruct)
+listaValoresInicializacion:
+    valorInicializacion (COMA valorInicializacion)*
     ;
 
-/*SINTAXIS SECCION MAIN*/
+valorInicializacion:
+    expresion
+    | inicializacionStruct
+    ;
+
+/* =========================================================
+   SECCION MAIN
+   ========================================================= */
+
 seccionMain:
-    SECCIONMAIN MAYOR sentencia* FINIS PUNTO_COMA
+    SECCIONMAIN MAYOR
+    sentencia*
+    FINIS PUNTO_COMA
     ;
 
+/* =========================================================
+   SENTENCIAS
+   ========================================================= */
 
 sentencia:
     declaracionVariable
@@ -98,86 +144,206 @@ sentencia:
     | INTERRUMPE PUNTO_COMA
     ;
 
+/* =========================================================
+   INCREMENTO / DECREMENTO
+   ========================================================= */
+
 incrementoDecremento:
-    ID acceso* (INCREMENTO | DECREMENTO) PUNTO_COMA
+    ID acceso*
+    (INCREMENTO | DECREMENTO)
+    PUNTO_COMA
     ;
 
+/* =========================================================
+   ASIGNACIONES
+   ========================================================= */
 
 asignacion:
-    ID acceso* IGUAL (expresion | inicializacionStruct) PUNTO_COMA
+    ID acceso*
+    IGUAL
+    (expresion | inicializacionStruct)
+    PUNTO_COMA
     ;
 
+/* =========================================================
+   CONDICIONALES
+   ========================================================= */
+
 condicional:
-    SI PARENTESIS_ABRE expresion PARENTESIS_CIERRA LLAVE_ABRE sentencia* LLAVE_CIERRA
-    (ALITER PARENTESIS_ABRE expresion PARENTESIS_CIERRA LLAVE_ABRE sentencia* LLAVE_CIERRA)*
-    (ALITER LLAVE_ABRE sentencia* LLAVE_CIERRA)?
+    SI
+    PARENTESIS_ABRE expresion PARENTESIS_CIERRA
+    bloquePig
+
+    (
+        ALITER
+        PARENTESIS_ABRE expresion PARENTESIS_CIERRA
+        bloquePig
+    )*
+
+    (
+        ALITER
+        bloquePig
+    )?
+
     FINIS PUNTO_COMA
     ;
 
-cicloDum:
-    DUM PARENTESIS_ABRE expresion PARENTESIS_CIERRA LLAVE_ABRE sentencia* LLAVE_CIERRA FINIS PUNTO_COMA
+/** { sentencia* } como sub-regla propia: así cada rama (si / aliter / aliter) tiene
+    su PROPIO contexto en el árbol de parseo. Si se deja inline, ANTLR aplana las
+    sentencias de TODAS las ramas en una sola lista y se pierde a cuál rama pertenece
+    cada una — rompe la construcción del AST del condicional. */
+bloquePig:
+    LLAVE_ABRE sentencia* LLAVE_CIERRA
     ;
+
+/* =========================================================
+   CICLO DUM - WHILE
+   ========================================================= */
+
+cicloDum:
+    DUM
+    PARENTESIS_ABRE expresion PARENTESIS_CIERRA
+    LLAVE_ABRE sentencia* LLAVE_CIERRA
+    FINIS PUNTO_COMA
+    ;
+
+/* =========================================================
+   CICLO FACERE - DO WHILE
+   ========================================================= */
 
 cicloFacere:
-    FACERE LLAVE_ABRE sentencia* LLAVE_CIERRA DUM PARENTESIS_ABRE expresion PARENTESIS_CIERRA PUNTO_COMA
+    FACERE
+    LLAVE_ABRE sentencia* LLAVE_CIERRA
+    DUM
+    PARENTESIS_ABRE expresion PARENTESIS_CIERRA
+    PUNTO_COMA
     ;
+
+/* =========================================================
+   CICLO PER - FOR
+   ========================================================= */
 
 cicloPer:
-     PER PARENTESIS_ABRE inicializacionPer expresion PUNTO_COMA actualizacionPer PARENTESIS_CIERRA
-     LLAVE_ABRE sentencia* LLAVE_CIERRA
+    PER
+    PARENTESIS_ABRE
+
+    inicializacionPer
+    PUNTO_COMA
+
+    expresion
+    PUNTO_COMA
+
+    actualizacionPer
+
+    PARENTESIS_CIERRA
+
+    LLAVE_ABRE sentencia* LLAVE_CIERRA
     ;
+
+/* =========================================================
+   INICIALIZACION DEL FOR
+   ========================================================= */
 
 inicializacionPer:
-    declaracionVariable
-    | ID acceso* IGUAL expresion PUNTO_COMA
+    ESTO ID DOSPUNTOS tipo expresion?
+    | ID acceso* IGUAL expresion
     ;
+
+/* =========================================================
+   ACTUALIZACION DEL FOR
+   ========================================================= */
 
 actualizacionPer:
-    ID acceso* IGUAL expresion
-    | expresion
+    ID acceso*
+    (INCREMENTO | DECREMENTO)
+
+    | ID acceso* IGUAL expresion
     ;
+
+/* =========================================================
+   IMPRESION
+   ========================================================= */
 
 imprimir:
-    MAYORIMPRIMIR expresion (MAYORIMPRIMIR expresion)* PUNTO_COMA
+    MAYORIMPRIMIR
+    expresion
+    (MAYORIMPRIMIR expresion)*
+    PUNTO_COMA
     ;
+
+/* =========================================================
+   LECTURA
+   ========================================================= */
 
 leer:
-    (ID acceso*)? MENORLEER
+    (ID acceso*)?
+    MENORLEER
+    PUNTO_COMA?
     ;
 
+/* =========================================================
+   LLAMADA A FUNCION COMO SENTENCIA
+   ========================================================= */
 
 llamadaFuncionSentencia:
     llamadaFuncion PUNTO_COMA
     ;
 
+/* =========================================================
+   ====================== EXPRESIONES ======================
+   ========================================================= */
 
-/*EXPRESION UTILIZANDO LA PRECEDENCIA*/
+/*
+   Precedencia:
+
+   OR
+       AND
+           igualdad
+               relacional
+                   aditiva
+                       multiplicativa
+                           unaria
+                               primaria
+*/
+
 expresion:
     expresionOr
     ;
 
 expresionOr:
-    expresionAnd (OR expresionAnd)*
+    expresionAnd
+    (OR expresionAnd)*
     ;
 
 expresionAnd:
-    expresionIgualdad (AND expresionIgualdad)*
+    expresionIgualdad
+    (AND expresionIgualdad)*
     ;
 
 expresionIgualdad:
-    expresionRelacional ((COMPARACION | DIFERENCIA) expresionRelacional)*
+    expresionRelacional
+    ((COMPARACION | DIFERENCIA) expresionRelacional)*
     ;
 
 expresionRelacional:
-    expresionAditiva ((MENOR | MAYOR | MAYORIGUAL | MENORIGUAL) expresionAditiva)*
+    expresionAditiva
+    (
+        (MENOR | MAYOR | MAYORIGUAL | MENORIGUAL)
+        expresionAditiva
+    )*
     ;
 
 expresionAditiva:
-    expresionMultiplicativa ((MAS | RESTA) expresionMultiplicativa)*
+    expresionMultiplicativa
+    ((MAS | RESTA) expresionMultiplicativa)*
     ;
 
 expresionMultiplicativa:
-    expresionUnaria ((MULTIPLICACION | DIVISION) expresionUnaria)*
+    expresionUnaria
+    (
+        (MULTIPLICACION | DIVISION | MODULO)
+        expresionUnaria
+    )*
     ;
 
 expresionUnaria:
@@ -185,17 +351,44 @@ expresionUnaria:
     | expresionPrimaria
     ;
 
+/* =========================================================
+   EXPRESION PRIMARIA
+   ========================================================= */
+
 expresionPrimaria:
     literal
+    | creacionObjeto
     | llamadaFuncion
     | ID acceso* (INCREMENTO | DECREMENTO)?
     | PARENTESIS_ABRE expresion PARENTESIS_CIERRA
     ;
 
+/* =========================================================
+   CREACION DE OBJETOS
+   ========================================================= */
+
+creacionObjeto:
+    NOVUS
+    ID
+    PARENTESIS_ABRE
+    listaArgumentos?
+    PARENTESIS_CIERRA
+    ;
+
+/* =========================================================
+   ACCESO A CAMPOS, ARREGLOS Y METODOS
+   ========================================================= */
+
 acceso:
     CORCHETE_ABRE expresion CORCHETE_CIERRA
     | PUNTO ID
+    | PUNTO ID
+      PARENTESIS_ABRE listaArgumentos? PARENTESIS_CIERRA
     ;
+
+/* =========================================================
+   LITERALES
+   ========================================================= */
 
 literal:
     ENTERO
@@ -206,103 +399,349 @@ literal:
     | FALSUS
     ;
 
+/* =========================================================
+   LLAMADA A FUNCION
+   ========================================================= */
+
 llamadaFuncion:
-    ID PARENTESIS_ABRE listaArgumentos? PARENTESIS_CIERRA
+    ID
+    PARENTESIS_ABRE
+    listaArgumentos?
+    PARENTESIS_CIERRA
     ;
 
 listaArgumentos:
-    expresion (COMA expresion)*
+    expresion
+    (COMA expresion)*
     ;
 
 
-/*LEXER*/
+/* =========================================================
+   ======================== LEXER ==========================
+   ========================================================= */
 
-WS: [ \t\n\r]+ -> skip;
+/* =========================================================
+   ESPACIOS
+   ========================================================= */
 
-/*COMENTARIOS*/
-COMENTARIO_LINEA: '//' ~[\r\n]* -> skip;
-COMENTARIO_BLOQUE: '/*' .*? '*/' -> skip;
+WS:
+    [ \t\n\r]+ -> skip
+    ;
 
-/*INCREMENTO Y DECREMENTO*/
-INCREMENTO: '++';
-DECREMENTO: '--';
+/* =========================================================
+   COMENTARIOS
+   ========================================================= */
 
-/*ARITMETICOS*/
-MAS: '+';
-RESTA: '-';
-MULTIPLICACION: '*';
-DIVISION: '/';
+COMENTARIO_LINEA:
+    '//' ~[\r\n]* -> skip
+    ;
 
-/*SIGNOS ESPECIALES*/
-MENORLEER: '<<';
-MAYORIMPRIMIR: '>>';
-COMILLAS: '"' (ESC | ~["\\])* '"';
-fragment ESC: '\\' . ;
-COMILLASSIMPLES: '\'' ~['\r\n] '\'';
+COMENTARIO_BLOQUE:
+    '/*' .*? '*/' -> skip
+    ;
 
-/*RELACIONALES*/
-MAYORIGUAL: '>=';
-MENORIGUAL: '<=';
-COMPARACION: '==';
-DIFERENCIA: '!=';
-MENOR: '<';
-MAYOR: '>';
+/* =========================================================
+   INCREMENTO Y DECREMENTO
+   ========================================================= */
 
-/*LOGICOS*/
-AND: '&&';
-OR: '||';
-NEGACION: 'non';
+INCREMENTO:
+    '++'
+    ;
 
-/*TIPOS DE DATOS*/
-NUMEROS: 'numerus';
-TEXTUM: 'textum';
-DECIMALIS: 'decimalis';
-LITTERA: 'littera';
-BOOL: 'bool';
+DECREMENTO:
+    '--'
+    ;
 
-/*BOOLEANOS*/
-VERUM: 'verum';
-FALSUS: 'falsus';
+/* =========================================================
+   OPERADORES ARITMETICOS
+   ========================================================= */
 
-/*SECCIONES*/
-SECCIONVARIABLE: 'VARIABILES';
-SECCIONMAIN: 'MAIOR';
+MAS:
+    '+'
+    ;
 
-/*STRUCT*/
-ESTRUCTURA: 'estructura';
-FINIS: 'finis' | 'FINIS';
+RESTA:
+    '-'
+    ;
 
-/*CONDICIONALES*/
-SI: 'si';
-ALITER: 'aliter';
+MULTIPLICACION:
+    '*'
+    ;
 
-/*CICLOS*/
-DUM: 'dum'; /*CICLO SIMPLE*/
-FACERE: 'facere'; /*CICLO DO-WHILE*/
-PER: 'per'; /*CICLO CON ITERADOR*/
-PERGE: 'perge'; /*CONTINUE*/
-INTERRUMPE: 'interrumpe'; /*BREAK*/
+DIVISION:
+    '/'
+    ;
 
-/*IMPORTACIONES Y CREACION DE OBJETOS*/
-IMPORT: 'import';
-NOVUS: 'novus';
+MODULO:
+    '%'
+    ;
 
-/*VARIABLES*/
-ESTO: 'esto';
-SERIES: 'series';
-DOSPUNTOS: ':';
-ID: [a-zA-Z_][a-zA-Z_0-9]*;
-ENTERO: [0-9]+;
-DECIMAL: [0-9]+ '.' [0-9]+;
-IGUAL: '=';
+/* =========================================================
+   SIGNOS ESPECIALES
+   ========================================================= */
 
-/*SIGNOS*/
-LLAVE_ABRE: '{';
-LLAVE_CIERRA: '}';
-CORCHETE_ABRE: '[';
-CORCHETE_CIERRA: ']';
-PARENTESIS_ABRE: '(';
-PARENTESIS_CIERRA: ')';
-PUNTO_COMA: ';';
-PUNTO: '.';
-COMA: ',';
+MENORLEER:
+    '<<'
+    ;
+
+MAYORIMPRIMIR:
+    '>>'
+    ;
+
+COMILLAS:
+    '"' (ESC | ~["\\])* '"'
+    ;
+
+fragment ESC:
+    '\\' .
+    ;
+
+COMILLASSIMPLES:
+    '\'' ~['\r\n] '\''
+    ;
+
+/* =========================================================
+   OPERADORES RELACIONALES
+   ========================================================= */
+
+MAYORIGUAL:
+    '>='
+    ;
+
+MENORIGUAL:
+    '<='
+    ;
+
+COMPARACION:
+    '=='
+    ;
+
+DIFERENCIA:
+    '!='
+    ;
+
+MENOR:
+    '<'
+    ;
+
+MAYOR:
+    '>'
+    ;
+
+/* =========================================================
+   OPERADORES LOGICOS
+   ========================================================= */
+
+AND:
+    '&&'
+    ;
+
+OR:
+    '||'
+    ;
+
+NEGACION:
+    'non'
+    ;
+
+/* =========================================================
+   TIPOS DE DATOS
+   ========================================================= */
+
+NUMEROS:
+    'numerus'
+    ;
+
+TEXTUM:
+    'textum'
+    ;
+
+DECIMALIS:
+    'decimalis'
+    ;
+
+LITTERA:
+    'littera'
+    ;
+
+BOOL:
+    'bool'
+    ;
+
+/* =========================================================
+   BOOLEANOS
+   ========================================================= */
+
+VERUM:
+    'verum'
+    ;
+
+FALSUS:
+    'falsus'
+    ;
+
+/* =========================================================
+   SECCIONES
+   ========================================================= */
+
+SECCIONVARIABLE:
+    'VARIABILES'
+    ;
+
+SECCIONMAIN:
+    'MAIOR'
+    ;
+
+/* =========================================================
+   ESTRUCTURAS
+   ========================================================= */
+
+/*
+   Las estructuras NO se declaran en Pig Latin.
+   Se importan desde archivos .y.
+*/
+
+/* =========================================================
+   FINAL DE BLOQUES
+   ========================================================= */
+
+FINIS:
+    'finis'
+    ;
+
+/* =========================================================
+   CONDICIONALES
+   ========================================================= */
+
+SI:
+    'si'
+    ;
+
+ALITER:
+    'aliter'
+    ;
+
+/* =========================================================
+   CICLOS
+   ========================================================= */
+
+DUM:
+    'dum'
+    ;
+
+FACERE:
+    'facere'
+    ;
+
+PER:
+    'per'
+    ;
+
+PERGE:
+    'perge'
+    ;
+
+INTERRUMPE:
+    'interrumpe'
+    ;
+
+/* =========================================================
+   IMPORTACIONES Y OBJETOS
+   ========================================================= */
+
+IMPORT:
+    'import'
+    ;
+
+NOVUS:
+    'novus'
+    ;
+
+/* =========================================================
+   VARIABLES
+   ========================================================= */
+
+ESTO:
+    'esto'
+    ;
+
+SERIES:
+    'series'
+    ;
+
+/* =========================================================
+   IDENTIFICADORES
+   ========================================================= */
+
+ID:
+    [a-zA-Z_] [a-zA-Z_0-9]*
+    ;
+
+/* =========================================================
+   NUMEROS
+   ========================================================= */
+
+/*
+   DECIMAL debe aparecer antes que ENTERO para
+   mantener clara la intención del lexer.
+*/
+
+DECIMAL:
+    [0-9]+ '.' [0-9]+
+    ;
+
+ENTERO:
+    [0-9]+
+    ;
+
+/* =========================================================
+   ASIGNACION
+   ========================================================= */
+
+IGUAL:
+    '='
+    ;
+
+/* =========================================================
+   SIGNOS DE ESTRUCTURA
+   ========================================================= */
+
+DOSPUNTOS:
+    ':'
+    ;
+
+LLAVE_ABRE:
+    '{'
+    ;
+
+LLAVE_CIERRA:
+    '}'
+    ;
+
+CORCHETE_ABRE:
+    '['
+    ;
+
+CORCHETE_CIERRA:
+    ']'
+    ;
+
+PARENTESIS_ABRE:
+    '('
+    ;
+
+PARENTESIS_CIERRA:
+    ')'
+    ;
+
+PUNTO_COMA:
+    ';'
+    ;
+
+PUNTO:
+    '.'
+    ;
+
+COMA:
+    ','
+    ;

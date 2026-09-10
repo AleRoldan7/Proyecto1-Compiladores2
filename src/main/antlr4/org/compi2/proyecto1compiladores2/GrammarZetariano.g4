@@ -16,8 +16,9 @@ contenidoClase:
     | metodo         # contenidoMetodo
     ;
 
+/* FIX: se permite inicializar atributos con listaValores, igual que declaracionVariable */
 atributo:
-    tipo ID dimension? (IGUAL expresion)? PUNTO_COMA
+    tipo ID (IGUAL (expresion | listaValores))? PUNTO_COMA
     ;
 
 constructor:
@@ -32,19 +33,31 @@ listaParametros:
     parametro (COMA parametro)*
     ;
 
+/* FIX: ya no necesita "dimension" aparte; los corchetes ahora viven en "tipo" */
 parametro:
-    tipo dimension? ID
+    tipo ID
     ;
 
-tipo:
+/* Tipo primitivo u objeto, sin arreglo */
+tipoBase:
       INT | DOUBLE | CHAR | STRING | BOOLEAN | ID
     ;
 
-dimension:
-    (CORCHETE_ABRE expresion? CORCHETE_CIERRA)+
+/* FIX: arreglos al estilo Java: int[], String[], int[][], etc.
+   (antes los corchetes iban después del ID, estilo Y?, lo cual no
+   coincide con los ejemplos de Zetariano del enunciado) */
+tipo:
+    tipoBase (CORCHETE_ABRE CORCHETE_CIERRA)*
     ;
 
 /* --------- Bloques y sentencias --------- */
+
+/** Si el cuerpo de un if/else if/else es una sola sentencia, las llaves son opcionales
+    (el enunciado lo exige explícitamente, con ejemplo de ifs anidados sin llaves) */
+cuerpo:
+      bloque
+    | sentencia
+    ;
 
 bloque:
     LLAVE_ABRE sentencia* LLAVE_CIERRA
@@ -55,9 +68,12 @@ sentencia:
     | asignacion PUNTO_COMA                                 # sentAsignacion
     | llamadaFuncion PUNTO_COMA                              # sentLlamadaFuncion
     | llamadaMetodo PUNTO_COMA                               # sentLlamadaMetodo
-    | (ID | accesoVariable) (INCREMENTO | DECREMENTO) PUNTO_COMA   # sentIncrDecrPostfijo
+    /* FIX: se quitó "ID |" porque accesoVariable ya cubre un ID solo (era redundante/ambiguo) */
+    | accesoVariable (INCREMENTO | DECREMENTO) PUNTO_COMA    # sentIncrDecrPostfijo
     | (INCREMENTO | DECREMENTO) accesoVariable PUNTO_COMA    # sentIncrDecrPrefijo
     | imprimirStmt PUNTO_COMA                                # sentImprimir
+    /* FIX: readln() como sentencia independiente, antes solo existía dentro de una expresión */
+    | readlnExpr PUNTO_COMA                                  # sentReadln
     | RETURN expresion? PUNTO_COMA                           # sentReturn
     | BREAK PUNTO_COMA                                       # sentBreak
     | CONTINUE PUNTO_COMA                                    # sentContinue
@@ -70,11 +86,16 @@ sentencia:
     ;
 
 declaracionVariable:
-    tipo ID dimension? (IGUAL (expresion | listaValores))?
+    tipo ID (IGUAL (expresion | listaValores))?
     ;
 
 listaValores:
-    LLAVE_ABRE (expresion (COMA expresion)*)? LLAVE_CIERRA
+    LLAVE_ABRE (elementoLista (COMA elementoLista)*)? LLAVE_CIERRA
+    ;
+
+elementoLista:
+      expresion
+    | listaValores
     ;
 
 asignacion:
@@ -88,9 +109,9 @@ accesoVariable:
 /* --------- Condicionales --------- */
 
 condicional:
-    IF PARENTESIS_ABRE expresion PARENTESIS_CIERRA bloque
-    (ELSE IF PARENTESIS_ABRE expresion PARENTESIS_CIERRA bloque)*
-    (ELSE bloque)?
+    IF PARENTESIS_ABRE expresion PARENTESIS_CIERRA cuerpo
+    (ELSE IF PARENTESIS_ABRE expresion PARENTESIS_CIERRA cuerpo)*
+    (ELSE cuerpo)?
     ;
 
 switchCase:
@@ -104,8 +125,10 @@ casoSwitch:
     CASE literal DOS_PUNTOS bloqueCaso
     ;
 
+/* El break ya no es obligatorio (se permite fall-through, como en Java/C): como BREAK ya es
+   una alternativa normal de 'sentencia' (ver sentBreak), sentencia* solo ya lo cubre. */
 bloqueCaso:
-    sentencia* BREAK PUNTO_COMA
+    sentencia*
     ;
 
 /* --------- Ciclos --------- */
@@ -114,11 +137,11 @@ cicloFor:
     FOR PARENTESIS_ABRE (declaracionVariable | asignacion)? PUNTO_COMA
                           expresion? PUNTO_COMA
                           (asignacion | (accesoVariable (INCREMENTO | DECREMENTO)) | ((INCREMENTO | DECREMENTO) accesoVariable))?
-                          PARENTESIS_CIERRA bloque
+                          PARENTESIS_CIERRA cuerpo
     ;
 
 cicloWhile:
-    WHILE PARENTESIS_ABRE expresion PARENTESIS_CIERRA bloque
+    WHILE PARENTESIS_ABRE expresion PARENTESIS_CIERRA cuerpo
     ;
 
 cicloDoWhile:
@@ -145,6 +168,8 @@ expresion:
     | (INCREMENTO | DECREMENTO) accesoVariable                         # expPreIncrDecr
     | accesoVariable (INCREMENTO | DECREMENTO)                         # expPostIncrDecr
     | NEW ID PARENTESIS_ABRE listaArgumentos? PARENTESIS_CIERRA         # expCrearObjeto
+    /* FIX: nueva alternativa para crear arreglos, p.ej. new int[5], new int[3][3] */
+    | NEW tipoBase (CORCHETE_ABRE expresion CORCHETE_CIERRA)+           # expCrearArreglo
     | expresion op=(MULTIPLICACION | DIVISION | MODULO) expresion      # expMultiplicativa
     | expresion op=(MAS | RESTA) expresion                             # expAditiva
     | expresion op=(MENOR | MAYOR | MENORIGUAL | MAYORIGUAL) expresion # expRelacional
@@ -172,8 +197,9 @@ listaArgumentos:
     expresion (COMA expresion)*
     ;
 
+/* FIX: se agrega NULL, usado en el enunciado (p1 == null) */
 literal:
-    ENTERO | DECIMAL | COMILLAS | COMILLASSIMPLES | TRUE | FALSE
+    ENTERO | DECIMAL | COMILLAS | COMILLASSIMPLES | TRUE | FALSE | NULL
     ;
 
 
@@ -222,6 +248,7 @@ THIS: 'this';
 
 TRUE: 'true';
 FALSE: 'false';
+NULL: 'null';
 
 IF: 'if';
 ELSE: 'else';

@@ -27,9 +27,6 @@ public class AnalisisContexto {
         this.tablaTipos = tablaTipos;
     }
 
-
-
-
     public void entrarCiclo() {
         sizeCiclo++;
     }

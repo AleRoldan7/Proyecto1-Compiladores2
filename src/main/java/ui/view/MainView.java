@@ -111,19 +111,27 @@ public class MainView extends BorderPane {
 
         // ---- Archivo ----
         MenuButton buttonArchivo = new MenuButton("Archivo");
-        MenuItem nuevo = new MenuItem("Nuevo");
-        MenuItem abrir = new MenuItem("Abrir");
-        MenuItem carpeta = new MenuItem("Carpeta");
+        MenuItem nuevo = new MenuItem("Nuevo archivo");
+        MenuItem nuevaCarpeta = new MenuItem("Nueva carpeta");
+        MenuItem abrir = new MenuItem("Abrir archivo");
+        MenuItem abrirCarpeta = new MenuItem("Abrir carpeta");
         MenuItem guardar = new MenuItem("Guardar");
         MenuItem guardarComo = new MenuItem("Guardar Como");
         MenuItem descargar = new MenuItem("Descargar");
         MenuItem cerrarPestana = new MenuItem("Cerrar pestaña");
 
         buttonArchivo.getItems().addAll(
-                nuevo, new SeparatorMenuItem(),
-                abrir, carpeta, new SeparatorMenuItem(),
-                guardar, guardarComo, new SeparatorMenuItem(),
-                descargar, new SeparatorMenuItem(),
+                nuevo,
+                nuevaCarpeta,
+                new SeparatorMenuItem(),
+                abrir,
+                abrirCarpeta,
+                new SeparatorMenuItem(),
+                guardar,
+                guardarComo,
+                new SeparatorMenuItem(),
+                descargar,
+                new SeparatorMenuItem(),
                 cerrarPestana
         );
 
@@ -138,11 +146,20 @@ public class MainView extends BorderPane {
             }
         });
 
-        carpeta.setOnAction(e -> {
+        abrirCarpeta.setOnAction(e -> {
             try {
                 arbolDeTrabajo.abrirCarpeta();
             } catch (Exception ex) {
                 mostrarError("No se pudo abrir la carpeta");
+                ex.printStackTrace();
+            }
+        });
+
+        nuevaCarpeta.setOnAction(e -> {
+            try {
+                arbolDeTrabajo.crearNuevaCarpeta();
+            } catch (Exception ex) {
+                mostrarError("No se pudo crear la carpeta");
                 ex.printStackTrace();
             }
         });
@@ -520,7 +537,6 @@ public class MainView extends BorderPane {
     }
 
     private void onGenerarC3D() {
-        // TODO: generar cuartetas y mostrar la tabla correspondiente en 'contenido'
         mostrarEstado("Generando C3D...", TEXTO_SECUNDARIO);
     }
 

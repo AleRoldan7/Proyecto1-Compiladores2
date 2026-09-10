@@ -3,22 +3,40 @@ grammar GrammarPython;
 /*GRAMATICA*/
 
 program:
+    NEWLINE*
     seccionEstructuras?
     NEWLINE*
     seccionFunciones
+    NEWLINE*
     EOF
     ;
 
 seccionEstructuras:
-    SECCION_ESTRUCTURA NEWLINE declaracionEstructura+
+    SECCION_ESTRUCTURA NEWLINE NEWLINE*
+    declaracionEstructura
+    (NEWLINE* declaracionEstructura)*
     ;
 
+/* FIX: los campos de una estructura ya no reutilizan declaracionVariable
+   completa (que permite inicializadores y tamaño de arreglo dinámico);
+   ahora usan campoEstructura, que obliga a que el tamaño del arreglo
+   sea una constante, tal como lo exige el enunciado
+   ("la expresión para definir arreglos obligatoriamente debe ser
+   constante, únicamente dentro de la definición de una estructura") */
 declaracionEstructura:
-    ESTRUCTURA ID DOS_PUNTOS NEWLINE INDENT declaracionVariable NEWLINE (declaracionVariable NEWLINE)* DEDENT
+    ESTRUCTURA ID DOS_PUNTOS NEWLINE
+    INDENT
+    campoEstructura NEWLINE
+    (campoEstructura NEWLINE)*
+    DEDENT
+    ;
+
+campoEstructura:
+    tipo ID dimension?
     ;
 
 seccionFunciones:
-    SECCION_FUNCION NEWLINE declaracionFuncion+
+    SECCION_FUNCION NEWLINE NEWLINE* declaracionFuncion+
     ;
 
 declaracionFuncion:
@@ -36,13 +54,18 @@ parametro:
     ;
 
 bloque:
-    NEWLINE INDENT sentencia+ DEDENT
+    NEWLINE INDENT (sentencia | NEWLINE)* DEDENT
     ;
 
 sentencia:
       declaracionVariable NEWLINE          # sentDeclaracionVariable
     | asignacion NEWLINE                    # sentAsignacion
     | llamadaFuncion NEWLINE                 # sentLlamadaFuncion
+    /* FIX: incremento/decremento como sentencia independiente
+       (el enunciado usa "contador++;", "intentos++" como línea suelta,
+       lo cual antes solo era válido dentro de una expresión) */
+    | accesoVariable (INCREMENTO | DECREMENTO) NEWLINE   # sentIncrDecrPostfijo
+    | (INCREMENTO | DECREMENTO) accesoVariable NEWLINE   # sentIncrDecrPrefijo
     | imprimirStmt NEWLINE                   # sentImprimir
     | leerStmt NEWLINE                       # sentLeer
     | RETORNO expresion? NEWLINE             # sentRetorno
@@ -61,6 +84,8 @@ declaracionVariable:
     tipo ID dimension? (IGUAL expresion)?
     ;
 
+/* Tamaño de arreglo: siempre constante (ningún ejemplo del enunciado usa tamaño dinámico,
+   ni dentro ni fuera de una estructura) */
 dimension:
     (CORCHETE_ABRE NUMERO_ENTERO CORCHETE_CIERRA)+
     ;
@@ -148,7 +173,11 @@ cicloPara:
     ;
 
 cicloMientras:
-      MIENTRAS PARENTESIS_ABRE expresion PARENTESIS_CIERRA HACER DOS_PUNTOS bloque   # cicloWhile
+      /* FIX: se quitó el DOS_PUNTOS extra después de HACER; el enunciado
+         muestra "mientras(contador < 5) hacer" seguido directo del bloque
+         indentado, sin dos puntos (a diferencia de "hacer:" del do-while,
+         donde HACER sí abre el bloque como palabra líder) */
+      MIENTRAS PARENTESIS_ABRE expresion PARENTESIS_CIERRA HACER bloque   # cicloWhile
     | HACER DOS_PUNTOS bloque MIENTRAS PARENTESIS_ABRE expresion PARENTESIS_CIERRA NEWLINE  # cicloDoWhile
     ;
 
@@ -169,6 +198,7 @@ leerExpr:
 /*LEXICO*/
 
 WS: [ ]+ -> skip;
+
 NEWLINE: ('\r'? '\n' | '\r') [ \t]*;
 
 COMENTARIO_LINEA: '//' ~[\r\n]* -> skip;
@@ -184,12 +214,14 @@ DIVISION: '/';
 
 COMILLAS: '"' (ESC | ~["\\])* '"';
 fragment ESC: '\\' . ;
+
 COMILLASSIMPLES: '\'' ~['\r\n] '\'';
 
 MAYORIGUAL: '>=';
 MENORIGUAL: '<=';
 COMPARACION: '==';
 DIFERENCIA: '!=';
+
 MENOR: '<';
 MAYOR: '>';
 
@@ -229,12 +261,13 @@ ESTRUCTURA: 'estructura';
 
 SECCION_FUNCION: '%funciones';
 DEFINIR: 'definir';
-RETORNO: 'retorno';
+RETORNO: 'retornar';
 TIPO_RETORNO: '->';
 
 ID: [a-zA-Z_][a-zA-Z_0-9]*;
-NUMERO_ENTERO: [0-9]+;
+
 DECIMAL: [0-9]+ '.' [0-9]+;
+NUMERO_ENTERO: [0-9]+;
 
 LLAVE_ABRE: '{';
 LLAVE_CIERRA: '}';
@@ -242,6 +275,7 @@ CORCHETE_ABRE: '[';
 CORCHETE_CIERRA: ']';
 PARENTESIS_ABRE: '(';
 PARENTESIS_CIERRA: ')';
+
 PUNTO_COMA: ';';
 PUNTO: '.';
 COMA: ',';

@@ -20,6 +20,7 @@ import static org.testng.AssertJUnit.fail;
 
 public class GeneradorC3DTest {
 
+    /*
     public static void main(String[] args) throws IOException, InterruptedException {
         String codigo = """
                 %funciones
@@ -132,6 +133,7 @@ public class GeneradorC3DTest {
             System.out.println("Obtenido: " + obtenido);
         }
 
-         */
+
     }
+    */
 }

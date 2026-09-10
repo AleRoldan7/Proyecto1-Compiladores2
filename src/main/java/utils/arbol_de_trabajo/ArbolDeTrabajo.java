@@ -30,6 +30,7 @@ public class ArbolDeTrabajo extends BorderPane {
 
     public ArbolDeTrabajo() {
         configurarArbol();
+        configurarMenuContextual();
         setCenter(arbol);
     }
 
@@ -215,6 +216,402 @@ public class ArbolDeTrabajo extends BorderPane {
         }
     }
 
+    private void configurarMenuContextual() {
+        arbol.setOnContextMenuRequested(evento -> {
+
+            TreeItem<File> seleccionado =
+                    arbol.getSelectionModel().getSelectedItem();
+
+            ContextMenu menu = new ContextMenu();
+
+            // Si no hay nada seleccionado
+            if (seleccionado == null) {
+                MenuItem nuevaCarpeta = new MenuItem("📁 Nueva carpeta");
+
+                nuevaCarpeta.setOnAction(e -> crearCarpeta(carpetaRaiz));
+
+                menu.getItems().add(nuevaCarpeta);
+
+            } else {
+
+                File archivoSeleccionado = seleccionado.getValue();
+
+                // ------------------------------------------------
+                // Si seleccionamos una CARPETA
+                // ------------------------------------------------
+                if (archivoSeleccionado.isDirectory()) {
+
+                    MenuItem nuevoArchivo =
+                            new MenuItem("📄 Nuevo archivo");
+
+                    MenuItem nuevaCarpeta =
+                            new MenuItem("📁 Nueva carpeta");
+
+                    MenuItem actualizar =
+                            new MenuItem("🔄 Actualizar");
+
+                    nuevoArchivo.setOnAction(e ->
+                            crearArchivo(archivoSeleccionado, seleccionado)
+                    );
+
+                    nuevaCarpeta.setOnAction(e ->
+                            crearCarpeta(archivoSeleccionado)
+                    );
+
+                    actualizar.setOnAction(e ->
+                            refrescarNodo(seleccionado)
+                    );
+
+                    menu.getItems().addAll(
+                            nuevoArchivo,
+                            nuevaCarpeta,
+                            new SeparatorMenuItem(),
+                            actualizar
+                    );
+
+                    // ------------------------------------------------
+                    // Si seleccionamos un ARCHIVO
+                    // ------------------------------------------------
+                } else {
+
+                    MenuItem abrir =
+                            new MenuItem("📄 Abrir");
+
+                    MenuItem eliminar =
+                            new MenuItem("🗑 Eliminar");
+
+                    abrir.setOnAction(e ->
+                            cargarEnEditor(archivoSeleccionado)
+                    );
+
+                    eliminar.setOnAction(e ->
+                            eliminarArchivo(archivoSeleccionado, seleccionado)
+                    );
+
+                    menu.getItems().addAll(
+                            abrir,
+                            eliminar
+                    );
+                }
+            }
+
+            menu.show(
+                    arbol,
+                    evento.getScreenX(),
+                    evento.getScreenY()
+            );
+        });
+    }
+
+    private void crearCarpeta(File carpetaPadre) {
+
+        if (carpetaPadre == null || !carpetaPadre.isDirectory()) {
+            mostrarAlerta("Selecciona una carpeta primero.");
+            return;
+        }
+
+        TextInputDialog dialogo =
+                new TextInputDialog();
+
+        dialogo.setTitle("Nueva carpeta");
+        dialogo.setHeaderText("Crear una nueva carpeta");
+        dialogo.setContentText("Nombre:");
+
+        Optional<String> resultado =
+                dialogo.showAndWait();
+
+        if (resultado.isEmpty()) {
+            return;
+        }
+
+        String nombre = resultado.get().trim();
+
+        if (nombre.isEmpty()) {
+            mostrarAlerta("El nombre no puede estar vacío.");
+            return;
+        }
+
+        File nuevaCarpeta =
+                new File(carpetaPadre, nombre);
+
+        if (nuevaCarpeta.exists()) {
+            mostrarAlerta(
+                    "Ya existe una carpeta o archivo con ese nombre."
+            );
+            return;
+        }
+
+        if (nuevaCarpeta.mkdir()) {
+
+            TreeItem<File> nodoPadre =
+                    buscarNodo(carpetaPadre);
+
+            if (nodoPadre != null) {
+                agregarHijo(nodoPadre, nuevaCarpeta);
+                nodoPadre.setExpanded(true);
+            }
+
+        } else {
+            mostrarAlerta("No se pudo crear la carpeta.");
+        }
+    }
+
+    private void crearArchivo(
+            File carpetaPadre,
+            TreeItem<File> nodoPadre
+    ) {
+
+        ChoiceDialog<String> tipoDialogo =
+                new ChoiceDialog<>(
+                        "Y?",
+                        "Y?",
+                        "Zetariano",
+                        "Pig Latin"
+                );
+
+        tipoDialogo.setTitle("Nuevo archivo");
+        tipoDialogo.setHeaderText("Selecciona el tipo de archivo");
+        tipoDialogo.setContentText("Lenguaje:");
+
+        Optional<String> tipoResultado =
+                tipoDialogo.showAndWait();
+
+        if (tipoResultado.isEmpty()) {
+            return;
+        }
+
+        TextInputDialog nombreDialogo =
+                new TextInputDialog();
+
+        nombreDialogo.setTitle("Nuevo archivo");
+        nombreDialogo.setHeaderText("Nombre del archivo");
+        nombreDialogo.setContentText("Nombre:");
+
+        Optional<String> nombreResultado =
+                nombreDialogo.showAndWait();
+
+        if (nombreResultado.isEmpty()) {
+            return;
+        }
+
+        String nombre =
+                nombreResultado.get().trim();
+
+        if (nombre.isEmpty()) {
+            mostrarAlerta("El nombre no puede estar vacío.");
+            return;
+        }
+
+        String extension;
+
+        switch (tipoResultado.get()) {
+
+            case "Y?" -> extension = ".y";
+
+            case "Zetariano" -> extension = ".z";
+
+            case "Pig Latin" -> extension = ".pig";
+
+            default -> {
+                mostrarAlerta("Tipo de archivo inválido.");
+                return;
+            }
+        }
+
+        // Si el usuario escribió la extensión, no la duplicamos
+        if (!nombre.toLowerCase().endsWith(extension)) {
+            nombre += extension;
+        }
+
+        File nuevoArchivo =
+                new File(carpetaPadre, nombre);
+
+        if (nuevoArchivo.exists()) {
+            mostrarAlerta(
+                    "Ya existe un archivo con ese nombre."
+            );
+            return;
+        }
+
+        try {
+
+            Files.writeString(
+                    nuevoArchivo.toPath(),
+                    "",
+                    StandardCharsets.UTF_8
+            );
+
+            TreeItem<File> nuevoNodo =
+                    new NodoArchivo(nuevoArchivo);
+
+            nodoPadre.getChildren().add(nuevoNodo);
+            nodoPadre.setExpanded(true);
+
+            // Abrir automáticamente el archivo nuevo
+            cargarEnEditor(nuevoArchivo);
+
+        } catch (IOException ex) {
+
+            mostrarError(
+                    "No se pudo crear el archivo",
+                    ex
+            );
+        }
+    }
+
+    private void agregarHijo(
+            TreeItem<File> nodoPadre,
+            File archivo
+    ) {
+
+        TreeItem<File> nuevoNodo =
+                new NodoArchivo(archivo);
+
+        nodoPadre.getChildren().add(nuevoNodo);
+    }
+
+    private TreeItem<File> buscarNodo(File archivo) {
+
+        if (arbol.getRoot() == null) {
+            return null;
+        }
+
+        return buscarNodoRecursivo(
+                arbol.getRoot(),
+                archivo
+        );
+    }
+
+    private TreeItem<File> buscarNodoRecursivo(
+            TreeItem<File> nodo,
+            File archivo
+    ) {
+
+        if (nodo.getValue().equals(archivo)) {
+            return nodo;
+        }
+
+        for (TreeItem<File> hijo : nodo.getChildren()) {
+
+            TreeItem<File> encontrado =
+                    buscarNodoRecursivo(hijo, archivo);
+
+            if (encontrado != null) {
+                return encontrado;
+            }
+        }
+
+        return null;
+    }
+
+    private void refrescarNodo(TreeItem<File> nodo) {
+
+        File carpeta = nodo.getValue();
+
+        if (!carpeta.isDirectory()) {
+            return;
+        }
+
+        nodo.getChildren().clear();
+
+        File[] archivos =
+                carpeta.listFiles();
+
+        if (archivos == null) {
+            return;
+        }
+
+        Arrays.sort(
+                archivos,
+                Comparator.comparing(
+                        File::isFile
+                ).thenComparing(
+                        File::getName,
+                        String.CASE_INSENSITIVE_ORDER
+                )
+        );
+
+        for (File archivo : archivos) {
+            nodo.getChildren().add(
+                    new NodoArchivo(archivo)
+            );
+        }
+
+        nodo.setExpanded(true);
+    }
+
+    private void eliminarArchivo(
+            File archivo,
+            TreeItem<File> nodo
+    ) {
+
+        Alert confirmacion = new Alert(
+                Alert.AlertType.CONFIRMATION
+        );
+
+        confirmacion.setTitle("Eliminar");
+        confirmacion.setHeaderText(
+                "¿Eliminar " + archivo.getName() + "?"
+        );
+        confirmacion.setContentText(
+                "Esta acción no se puede deshacer."
+        );
+
+        Optional<ButtonType> resultado =
+                confirmacion.showAndWait();
+
+        if (resultado.isEmpty() ||
+                resultado.get() != ButtonType.OK) {
+            return;
+        }
+
+        try {
+
+            Files.delete(archivo.toPath());
+
+            if (archivo.equals(archivoActual)) {
+                archivoActual = null;
+            }
+
+            TreeItem<File> padre =
+                    nodo.getParent();
+
+            if (padre != null) {
+                padre.getChildren().remove(nodo);
+            }
+
+        } catch (IOException ex) {
+
+            mostrarError(
+                    "No se pudo eliminar el archivo",
+                    ex
+            );
+        }
+    }
+
+    public void crearNuevaCarpeta() {
+
+        if (carpetaRaiz == null) {
+            mostrarAlerta("Primero debes abrir una carpeta de proyecto.");
+            return;
+        }
+
+        TreeItem<File> seleccionado =
+                arbol.getSelectionModel().getSelectedItem();
+
+        File carpetaPadre;
+
+        if (seleccionado != null &&
+                seleccionado.getValue().isDirectory()) {
+
+            carpetaPadre = seleccionado.getValue();
+
+        } else {
+            carpetaPadre = carpetaRaiz;
+        }
+
+        crearCarpeta(carpetaPadre);
+    }
 
     private Window obtenerVentana() {
         return getScene() != null ? getScene().getWindow() : new Stage();

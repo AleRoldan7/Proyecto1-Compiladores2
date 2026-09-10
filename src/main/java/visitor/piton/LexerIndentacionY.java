@@ -2,18 +2,13 @@ package visitor.piton;
 
 import org.antlr.v4.runtime.*;
 import org.compi2.proyecto1compiladores2.GrammarPythonLexer;
-
 import java.util.*;
 
 public class LexerIndentacionY implements TokenSource {
 
     private final GrammarPythonLexer lexerBase;
-
-    private final Deque<Integer> pilaIndentacion =
-            new ArrayDeque<>(List.of(0));
-
-    private final Queue<Token> colaTokens =
-            new LinkedList<>();
+    private final Deque<Integer> pilaIndentacion = new ArrayDeque<>(List.of(0));
+    private final Queue<Token> colaTokens = new LinkedList<>();
 
     public LexerIndentacionY(GrammarPythonLexer lexerBase) {
         this.lexerBase = lexerBase;
@@ -34,15 +29,20 @@ public class LexerIndentacionY implements TokenSource {
         // ==========================================
         if (token.getType() == GrammarPythonLexer.NEWLINE) {
 
-            // IMPORTANTE:
-            // El NEWLINE NO se debe perder.
-            colaTokens.add(token);
+            CommonToken newlineToken = new CommonToken(token);
+            newlineToken.setText("<NEWLINE>");
 
+            // La regla NEWLINE incluye los espacios/tabs
+            // que aparecen después del salto de línea.
             int nivel = contarTabs(token.getText());
 
+            // IMPORTANTE:
+            // Primero devolvemos NEWLINE.
+            // Los INDENT/DEDENT quedan pendientes para
+            // el siguiente nextToken().
             procesarIndentacion(nivel, token);
 
-            return colaTokens.poll();
+            return newlineToken;
         }
 
         // ==========================================
@@ -50,11 +50,8 @@ public class LexerIndentacionY implements TokenSource {
         // ==========================================
         if (token.getType() == Token.EOF) {
 
-            // Cerrar todos los niveles pendientes
             while (pilaIndentacion.peek() > 0) {
-
                 pilaIndentacion.pop();
-
                 colaTokens.add(
                         crearTokenSintetico(
                                 GrammarPythonLexer.DEDENT,
@@ -72,74 +69,39 @@ public class LexerIndentacionY implements TokenSource {
     }
 
     private void procesarIndentacion(int nivel, Token origen) {
-
         int actual = pilaIndentacion.peek();
 
-        // ==========================================
-        // AUMENTA INDENTACIÓN
-        // ==========================================
         if (nivel > actual) {
-
             pilaIndentacion.push(nivel);
-
-            colaTokens.add(
-                    crearTokenSintetico(
-                            GrammarPythonLexer.INDENT,
-                            origen
-                    )
-            );
-
-        }
-
-        // ==========================================
-        // DISMINUYE INDENTACIÓN
-        // ==========================================
-        else {
-
-            while (nivel < pilaIndentacion.peek()) {
-
-                pilaIndentacion.pop();
-
-                colaTokens.add(
-                        crearTokenSintetico(
-                                GrammarPythonLexer.DEDENT,
-                                origen
-                        )
-                );
-            }
-        }
-    }
-
-    private int contarTabs(String textoNewline) {
-
-        int tabs = 0;
-
-        for (char c : textoNewline.toCharArray()) {
-
-            if (c == '\t') {
-                tabs++;
-            }
-        }
-
-        return tabs;
-    }
-
-    private CommonToken crearTokenSintetico(
-            int tipo,
-            Token origen) {
-
-        CommonToken t = new CommonToken(origen);
-
-        t.setType(tipo);
-
-        if (tipo == GrammarPythonLexer.INDENT) {
-            t.setText("<INDENT>");
+            colaTokens.add(crearTokenSintetico(GrammarPythonLexer.INDENT, origen));
         } else {
-            t.setText("<DEDENT>");
+            while (nivel < pilaIndentacion.peek()) {
+                pilaIndentacion.pop();
+                colaTokens.add(crearTokenSintetico(GrammarPythonLexer.DEDENT, origen));
+            }
         }
+    }
 
+    // Cambiado para contar espacios también
+    private int contarTabs(String textoNewline) {
+        int indentation = 0;
+        for (char c : textoNewline.toCharArray()) {
+            if (c == '\t') {
+                indentation += 4; // O 8, según tu convención
+            } else if (c == ' ') {
+                indentation++;
+            }
+        }
+        return indentation;
+    }
+
+    private CommonToken crearTokenSintetico(int tipo, Token origen) {
+        CommonToken t = new CommonToken(origen);
+        t.setType(tipo);
+        t.setText(tipo == GrammarPythonLexer.INDENT ? "<INDENT>" : "<DEDENT>");
         return t;
     }
+
 
     @Override
     public int getLine() {
