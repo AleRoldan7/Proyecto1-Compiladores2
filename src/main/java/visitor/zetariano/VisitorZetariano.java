@@ -28,8 +28,7 @@ import java.util.Collections;
 import java.util.List;
 
 
-public class VisitorZetariano
-        extends GrammarZetarianoBaseVisitor<NodoAST> {
+public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
 
     private final AnalisisContexto analisisContexto;
 
@@ -40,26 +39,14 @@ public class VisitorZetariano
         this.analisisContexto = contexto;
     }
 
-
-    /* =========================================================
-       ======================= CLASE ==========================
-       ========================================================= */
-
     @Override
-    public NodoAST visitCreacionClase(
-            GrammarZetarianoParser.CreacionClaseContext ctx) {
+    public NodoAST visitCreacionClase(GrammarZetarianoParser.CreacionClaseContext ctx) {
 
         String nombreClase = ctx.ID().getText();
 
-        /*
-         * Verificar si la clase ya existe.
-         */
         if (analisisContexto.getTablaTipos().existeTipo(nombreClase)) {
 
-            analisisContexto.reportarError(
-                    linea(ctx),
-                    columna(ctx),
-                    "El tipo '" + nombreClase + "' ya está definido"
+            analisisContexto.reportarError(linea(ctx), columna(ctx), "El tipo '" + nombreClase + "' ya está definido"
             );
         }
 
@@ -176,12 +163,66 @@ public class VisitorZetariano
         }
 
 
-        return new Atributo(
+        Atributo atributo = new Atributo(
                 linea(ctx),
                 columna(ctx),
                 tipo,
                 nombre
         );
+
+
+        /*
+         * FIX: el atributo ahora admite inicialización, igual que
+         * declaracionVariable:
+         *
+         * private int contador = 0;
+         * private int[] numeros = {1, 2, 3};
+         * private int[3][3] matriz = new int[3][3];
+         */
+        if (esTipoArreglo(ctx.tipo())) {
+
+            List<Expresion> valoresIniciales = new ArrayList<>();
+
+            if (ctx.listaValores() != null) {
+
+                for (var elemento : ctx.listaValores().elementoLista()) {
+
+                    valoresIniciales.add(
+                            (Expresion) visit(elemento)
+                    );
+                }
+            }
+
+
+            List<Expresion> dimensiones = new ArrayList<>();
+
+            if (ctx.expresion() != null) {
+
+                NodoAST inicializacion = visit(ctx.expresion());
+
+                if (inicializacion instanceof CrearArreglo crearArreglo) {
+                    dimensiones = crearArreglo.getDimensiones();
+                }
+            }
+
+            if (dimensiones.isEmpty()) {
+                for (int i = 0; i < cantidadDimensiones(ctx.tipo()); i++) {
+                    dimensiones.add(null);
+                }
+            }
+
+            atributo.setDimensiones(dimensiones);
+            atributo.setValoresIniciales(valoresIniciales);
+
+        } else if (ctx.expresion() != null) {
+
+            atributo.setInicializacion(
+                    (Expresion) visit(ctx.expresion())
+            );
+        }
+
+
+        return atributo;
     }
 
 
@@ -1446,258 +1487,106 @@ public class VisitorZetariano
         );
     }
 
-
-    /* =========================================================
-       =================== PRE INCREMENTO =====================
-       ========================================================= */
-
     @Override
-    public NodoAST visitExpPreIncrDecr(
-            GrammarZetarianoParser.ExpPreIncrDecrContext ctx) {
+    public NodoAST visitExpPreIncrDecr(GrammarZetarianoParser.ExpPreIncrDecrContext ctx) {
 
-        Expresion operando =
-                construirAccesoVariable(
-                        ctx.accesoVariable()
-                );
+        Expresion operando = construirAccesoVariable(ctx.accesoVariable());
 
+        String operador = ctx.INCREMENTO() != null ? "++" : "--";
 
-        String operador =
-                ctx.INCREMENTO() != null
-                        ? "++"
-                        : "--";
-
-
-        return new ExpresionUnaria(
-                linea(ctx),
-                columna(ctx),
-                operador,
-                operando,
-                true
-        );
+        return new ExpresionUnaria(linea(ctx), columna(ctx), operador, operando, true);
     }
 
-
-    /* =========================================================
-       ================= POST INCREMENTO ======================
-       ========================================================= */
-
     @Override
-    public NodoAST visitExpPostIncrDecr(
-            GrammarZetarianoParser.ExpPostIncrDecrContext ctx) {
+    public NodoAST visitExpPostIncrDecr(GrammarZetarianoParser.ExpPostIncrDecrContext ctx) {
 
-        Expresion operando =
-                construirAccesoVariable(
-                        ctx.accesoVariable()
-                );
+        Expresion operando = construirAccesoVariable(ctx.accesoVariable());
 
 
-        String operador =
-                ctx.INCREMENTO() != null
-                        ? "++"
-                        : "--";
+        String operador = ctx.INCREMENTO() != null ? "++" : "--";
 
-
-        return new ExpresionUnaria(
-                linea(ctx),
-                columna(ctx),
-                operador,
-                operando,
-                false
-        );
+        return new ExpresionUnaria(linea(ctx), columna(ctx), operador, operando, false);
     }
 
-
-    /* =========================================================
-       ===================== CREAR OBJETO =====================
-       ========================================================= */
-
     @Override
-    public NodoAST visitExpCrearObjeto(
-            GrammarZetarianoParser.ExpCrearObjetoContext ctx) {
+    public NodoAST visitExpCrearObjeto(GrammarZetarianoParser.ExpCrearObjetoContext ctx) {
 
-        String nombreClase =
-                ctx.ID().getText();
+        String nombreClase = ctx.ID().getText();
 
 
-        if (!analisisContexto.getTablaTipos()
-                .existeTipo(nombreClase)) {
+        if (!analisisContexto.getTablaTipos().existeTipo(nombreClase)) {
 
-            analisisContexto.reportarError(
-                    linea(ctx),
-                    columna(ctx),
-                    "La clase '" + nombreClase
-                            + "' no está definida"
-            );
+            analisisContexto.reportarError(linea(ctx), columna(ctx), "La clase '" + nombreClase + "' no está definida");
         }
 
 
-        List<Expresion> argumentos =
-                construirArgumentos(
-                        ctx.listaArgumentos()
-                );
+        List<Expresion> argumentos = construirArgumentos(ctx.listaArgumentos());
 
-
-        return new CrearObjeto(
-                linea(ctx),
-                columna(ctx),
-                nombreClase,
-                argumentos
-        );
+        return new CrearObjeto(linea(ctx), columna(ctx), nombreClase, argumentos);
     }
 
-
-    /* =========================================================
-       ===================== CREAR ARREGLO ====================
-       ========================================================= */
-
     @Override
-    public NodoAST visitExpCrearArreglo(
-            GrammarZetarianoParser.ExpCrearArregloContext ctx) {
+    public NodoAST visitExpCrearArreglo(GrammarZetarianoParser.ExpCrearArregloContext ctx) {
 
-        /*
-         * Ejemplos:
-         *
-         * new int[5]
-         * new int[3][3]
-         * new String[10]
-         */
+        String tipoBase = ctx.tipoBase().getText();
 
 
-        String tipoBase =
-                ctx.tipoBase().getText();
+        List<Expresion> dimensiones = new ArrayList<>();
 
 
-        List<Expresion> dimensiones =
-                new ArrayList<>();
+        for (var expresion : ctx.expresion()) {
 
-
-        for (var expresion :
-                ctx.expresion()) {
-
-            dimensiones.add(
-                    (Expresion) visit(expresion)
-            );
+            dimensiones.add((Expresion) visit(expresion));
         }
 
-
-        /*
-         * Los valores iniciales son null porque se está creando un arreglo vacío
-         */
-        return new CrearArreglo(
-                linea(ctx),
-                columna(ctx),
-                tipoBase,
-                dimensiones,
-                null
-        );
+        return new CrearArreglo(linea(ctx), columna(ctx), tipoBase, dimensiones, null);
     }
 
-
-    /* =========================================================
-       ===================== OPERADORES =======================
-       ========================================================= */
-
     @Override
-    public NodoAST visitExpMultiplicativa(
-            GrammarZetarianoParser.ExpMultiplicativaContext ctx) {
+    public NodoAST visitExpMultiplicativa(GrammarZetarianoParser.ExpMultiplicativaContext ctx) {
 
-        return binaria(
-                ctx,
-                ctx.expresion(0),
-                ctx.op.getText(),
-                ctx.expresion(1)
-        );
+        return binaria(ctx, ctx.expresion(0), ctx.op.getText(), ctx.expresion(1));
     }
 
 
     @Override
-    public NodoAST visitExpAditiva(
-            GrammarZetarianoParser.ExpAditivaContext ctx) {
+    public NodoAST visitExpAditiva(GrammarZetarianoParser.ExpAditivaContext ctx) {
 
-        return binaria(
-                ctx,
-                ctx.expresion(0),
-                ctx.op.getText(),
-                ctx.expresion(1)
-        );
+        return binaria(ctx, ctx.expresion(0), ctx.op.getText(), ctx.expresion(1));
     }
-
 
     @Override
-    public NodoAST visitExpRelacional(
-            GrammarZetarianoParser.ExpRelacionalContext ctx) {
+    public NodoAST visitExpRelacional(GrammarZetarianoParser.ExpRelacionalContext ctx) {
 
-        return binaria(
-                ctx,
-                ctx.expresion(0),
-                ctx.op.getText(),
-                ctx.expresion(1)
-        );
+        return binaria(ctx, ctx.expresion(0), ctx.op.getText(), ctx.expresion(1));
     }
-
 
     @Override
-    public NodoAST visitExpIgualdad(
-            GrammarZetarianoParser.ExpIgualdadContext ctx) {
+    public NodoAST visitExpIgualdad(GrammarZetarianoParser.ExpIgualdadContext ctx) {
 
-        return binaria(
-                ctx,
-                ctx.expresion(0),
-                ctx.op.getText(),
-                ctx.expresion(1)
-        );
+        return binaria(ctx, ctx.expresion(0), ctx.op.getText(), ctx.expresion(1));
     }
-
 
     @Override
-    public NodoAST visitExpAnd(
-            GrammarZetarianoParser.ExpAndContext ctx) {
+    public NodoAST visitExpAnd(GrammarZetarianoParser.ExpAndContext ctx) {
 
-        return binaria(
-                ctx,
-                ctx.expresion(0),
-                "&&",
-                ctx.expresion(1)
-        );
+        return binaria(ctx, ctx.expresion(0), "&&", ctx.expresion(1));
     }
-
 
     @Override
-    public NodoAST visitExpOr(
-            GrammarZetarianoParser.ExpOrContext ctx) {
+    public NodoAST visitExpOr(GrammarZetarianoParser.ExpOrContext ctx) {
 
-        return binaria(
-                ctx,
-                ctx.expresion(0),
-                "||",
-                ctx.expresion(1)
-        );
+        return binaria(ctx, ctx.expresion(0), "||", ctx.expresion(1));
     }
 
+    private NodoAST binaria(ParserRuleContext ctx, GrammarZetarianoParser.ExpresionContext izquierda, String operador,
+                            GrammarZetarianoParser.ExpresionContext derecha) {
 
-    private NodoAST binaria(
-            ParserRuleContext ctx,
-            GrammarZetarianoParser.ExpresionContext izquierda,
-            String operador,
-            GrammarZetarianoParser.ExpresionContext derecha) {
-
-        return new ExpresionBinaria(
-                linea(ctx),
-                columna(ctx),
-                (Expresion) visit(izquierda),
-                operador,
-                (Expresion) visit(derecha)
-        );
+        return new ExpresionBinaria(linea(ctx), columna(ctx), (Expresion) visit(izquierda), operador, (Expresion) visit(derecha));
     }
-
-
-    /* =========================================================
-       ======================== TERNARIO ======================
-       ========================================================= */
 
     @Override
-    public NodoAST visitExpTernaria(
-            GrammarZetarianoParser.ExpTernariaContext ctx) {
+    public NodoAST visitExpTernaria(GrammarZetarianoParser.ExpTernariaContext ctx) {
 
         return new ExpresionTernaria(
                 linea(ctx),
@@ -1709,141 +1598,72 @@ public class VisitorZetariano
     }
 
 
-    /* =========================================================
-       ========================== READLN =======================
-       ========================================================= */
-
     @Override
-    public NodoAST visitExpReadln(
-            GrammarZetarianoParser.ExpReadlnContext ctx) {
+    public NodoAST visitExpReadln(GrammarZetarianoParser.ExpReadlnContext ctx) {
 
-        return new LlamadaFuncion(
-                linea(ctx),
-                columna(ctx),
-                "readln",
-                List.of()
-        );
+        return new LlamadaFuncion(linea(ctx), columna(ctx), "readln", List.of());
     }
 
-
-    /* =========================================================
-       ===================== LLAMADA METODO ===================
-       ========================================================= */
-
     @Override
-    public NodoAST visitExpLlamadaMetodo(
-            GrammarZetarianoParser.ExpLlamadaMetodoContext ctx) {
+    public NodoAST visitExpLlamadaMetodo(GrammarZetarianoParser.ExpLlamadaMetodoContext ctx) {
 
         return visit(ctx.llamadaMetodo());
     }
 
 
     @Override
-    public NodoAST visitExpLlamadaFuncion(
-            GrammarZetarianoParser.ExpLlamadaFuncionContext ctx) {
+    public NodoAST visitExpLlamadaFuncion(GrammarZetarianoParser.ExpLlamadaFuncionContext ctx) {
 
         return visit(ctx.llamadaFuncion());
     }
 
 
-    /* =========================================================
-       ====================== ACCESO VARIABLE =================
-       ========================================================= */
-
     @Override
-    public NodoAST visitExpAcceso(
-            GrammarZetarianoParser.ExpAccesoContext ctx) {
+    public NodoAST visitExpAcceso(GrammarZetarianoParser.ExpAccesoContext ctx) {
 
-        return construirAccesoVariable(
-                ctx.accesoVariable()
-        );
+        return construirAccesoVariable(ctx.accesoVariable());
     }
 
 
-    /* =========================================================
-       ========================= LITERAL ======================
-       ========================================================= */
-
     @Override
-    public NodoAST visitExpLiteral(
-            GrammarZetarianoParser.ExpLiteralContext ctx) {
+    public NodoAST visitExpLiteral(GrammarZetarianoParser.ExpLiteralContext ctx) {
 
         return construirLiteral(ctx.literal());
     }
 
 
-    /* =========================================================
-       ============================ THIS ======================
-       ========================================================= */
-
     @Override
-    public NodoAST visitExpThis(
-            GrammarZetarianoParser.ExpThisContext ctx) {
+    public NodoAST visitExpThis(GrammarZetarianoParser.ExpThisContext ctx) {
 
-        return new Identificador(
-                linea(ctx),
-                columna(ctx),
-                "this"
-        );
+        return new Identificador(linea(ctx), columna(ctx), "this");
     }
 
-
-    /* =========================================================
-       ==================== LLAMADA FUNCION ===================
-       ========================================================= */
-
     @Override
-    public NodoAST visitLlamadaFuncion(
-            GrammarZetarianoParser.LlamadaFuncionContext ctx) {
+    public NodoAST visitLlamadaFuncion(GrammarZetarianoParser.LlamadaFuncionContext ctx) {
 
-        String nombre =
-                ctx.ID().getText();
+        String nombre = ctx.ID().getText();
 
-
-        /*
-         * Verificar que exista.
-         */
         if (analisisContexto.getTablaSimbolos()
                 .buscar(nombre) == null) {
 
-            analisisContexto.reportarError(
-                    linea(ctx),
-                    columna(ctx),
-                    "Método '" + nombre
-                            + "' no declarado en la clase"
-            );
+            analisisContexto.reportarError(linea(ctx), columna(ctx), "Método '" + nombre + "' no declarado en la clase");
         }
 
+        List<Expresion> argumentos = construirArgumentos(ctx.listaArgumentos());
 
-        List<Expresion> argumentos =
-                construirArgumentos(
-                        ctx.listaArgumentos()
-                );
-
-
-        return new LlamadaFuncion(
-                linea(ctx),
-                columna(ctx),
-                nombre,
-                argumentos
-        );
+        return new LlamadaFuncion(linea(ctx), columna(ctx), nombre, argumentos);
     }
 
 
-    /* =========================================================
-       ==================== LLAMADA METODO ====================
-       ========================================================= */
+
 
     @Override
-    public NodoAST visitLlamadaMetodo(
-            GrammarZetarianoParser.LlamadaMetodoContext ctx) {
+    public NodoAST visitLlamadaMetodo(GrammarZetarianoParser.LlamadaMetodoContext ctx) {
 
-        List<TerminalNode> ids =
-                ctx.ID();
+        List<TerminalNode> ids = ctx.ID();
 
 
-        int totalIds =
-                ids.size();
+        int totalIds = ids.size();
 
 
         Expresion objeto;
@@ -1851,104 +1671,51 @@ public class VisitorZetariano
         int siguienteId;
 
 
-        /*
-         * this.metodo()
-         */
         if (ctx.THIS() != null) {
 
-            objeto =
-                    new Identificador(
-                            linea(ctx),
-                            columna(ctx),
-                            "this"
-                    );
+            objeto = new Identificador(linea(ctx), columna(ctx), "this");
 
             siguienteId = 0;
 
         } else {
 
-            /*
-             * objeto.metodo()
-             */
-            String nombreBase =
-                    ids.get(0).getText();
+            String nombreBase = ids.get(0).getText();
 
 
-            if (analisisContexto.getTablaSimbolos()
-                    .buscar(nombreBase) == null) {
+            if (analisisContexto.getTablaSimbolos().buscar(nombreBase) == null) {
 
-                analisisContexto.reportarError(
-                        linea(ctx),
-                        columna(ctx),
-                        "Variable '" + nombreBase
-                                + "' no declarada"
-                );
+                analisisContexto.reportarError(linea(ctx), columna(ctx), "Variable '" + nombreBase + "' no declarada");
             }
 
 
-            objeto =
-                    new Identificador(
-                            linea(ctx),
-                            columna(ctx),
-                            nombreBase
-                    );
+            objeto = new Identificador(linea(ctx), columna(ctx), nombreBase);
 
 
             siguienteId = 1;
         }
 
 
-        /*
-         * Construir:
-         *
-         * persona.direccion.ciudad.hablar()
-         */
         while (siguienteId < totalIds - 1) {
 
-            objeto =
-                    new AccesoAtributo(
-                            linea(ctx),
-                            columna(ctx),
-                            objeto,
-                            ids.get(siguienteId++).getText()
-                    );
+            objeto = new AccesoAtributo(linea(ctx), columna(ctx), objeto, ids.get(siguienteId++).getText());
         }
 
 
-        String nombreMetodo =
-                ids.get(totalIds - 1).getText();
+        String nombreMetodo = ids.get(totalIds - 1).getText();
 
 
-        List<Expresion> argumentos =
-                construirArgumentos(
-                        ctx.listaArgumentos()
-                );
+        List<Expresion> argumentos = construirArgumentos(ctx.listaArgumentos());
 
 
-        return new LlamadaMetodo(
-                linea(ctx),
-                columna(ctx),
-                objeto,
-                nombreMetodo,
-                argumentos
-        );
+        return new LlamadaMetodo(linea(ctx), columna(ctx), objeto, nombreMetodo, argumentos);
     }
 
+    private Expresion construirAccesoVariable(GrammarZetarianoParser.AccesoVariableContext ctx) {
 
-    /* =========================================================
-       ================== CONSTRUIR ACCESO ====================
-       ========================================================= */
-
-    private Expresion construirAccesoVariable(
-            GrammarZetarianoParser.AccesoVariableContext ctx) {
-
-        List<TerminalNode> ids =
-                ctx.ID();
+        List<TerminalNode> ids = ctx.ID();
 
 
-        List<GrammarZetarianoParser.ExpresionContext>
-                indices =
-                ctx.expresion();
+        List<GrammarZetarianoParser.ExpresionContext> indices = ctx.expresion();
 
 
         int cursorId = 0;
@@ -1957,102 +1724,38 @@ public class VisitorZetariano
 
         Expresion actual;
 
-
-        /*
-         * this
-         */
         if (ctx.THIS() != null) {
 
-            actual =
-                    new Identificador(
-                            linea(ctx),
-                            columna(ctx),
-                            "this"
-                    );
+            actual = new Identificador(linea(ctx), columna(ctx), "this");
 
         } else {
 
-            /*
-             * Identificador inicial.
-             */
-            String nombre =
-                    ids.get(cursorId++).getText();
+            String nombre = ids.get(cursorId++).getText();
 
-
-            if (analisisContexto.getTablaSimbolos()
-                    .buscar(nombre) == null) {
-
-                analisisContexto.reportarError(
-                        linea(ctx),
-                        columna(ctx),
-                        "Variable '" + nombre
-                                + "' no declarada"
-                );
+            if (analisisContexto.getTablaSimbolos().buscar(nombre) == null) {
+                analisisContexto.reportarError(linea(ctx), columna(ctx), "Variable '" + nombre + "' no declarada");
             }
 
 
-            actual =
-                    new Identificador(
-                            linea(ctx),
-                            columna(ctx),
-                            nombre
-                    );
+            actual = new Identificador(linea(ctx), columna(ctx), nombre);
         }
 
+        for (int i = 0; i < ctx.getChildCount(); i++) {
 
-        /*
-         * Procesar la cadena de acceso.
-         *
-         * Ejemplos:
-         *
-         * persona.nombre
-         * persona.direccion.calle
-         * personas[0]
-         * personas[0].nombre
-         */
-        for (int i = 0;
-             i < ctx.getChildCount();
-             i++) {
-
-            String texto =
-                    ctx.getChild(i).getText();
+            String texto = ctx.getChild(i).getText();
 
 
-            /*
-             * Acceso por punto.
-             */
-            if (texto.equals(".")
-                    && cursorId < ids.size()) {
+            if (texto.equals(".") && cursorId < ids.size()) {
 
-                actual =
-                        new AccesoAtributo(
-                                linea(ctx),
-                                columna(ctx),
-                                actual,
-                                ids.get(cursorId++).getText()
-                        );
+                actual = new AccesoAtributo(linea(ctx), columna(ctx), actual, ids.get(cursorId++).getText());
             }
 
+            else if (texto.equals("[") && cursorIndice < indices.size()) {
 
-            /*
-             * Acceso por índice.
-             */
-            else if (texto.equals("[")
-                    && cursorIndice < indices.size()) {
-
-                Expresion indice =
-                        (Expresion) visit(
-                                indices.get(cursorIndice++)
-                        );
+                Expresion indice = (Expresion) visit(indices.get(cursorIndice++));
 
 
-                actual =
-                        new AccesoArreglo(
-                                linea(ctx),
-                                columna(ctx),
-                                actual,
-                                List.of(indice)
-                        );
+                actual = new AccesoArreglo(linea(ctx), columna(ctx), actual, List.of(indice));
             }
         }
 
@@ -2061,15 +1764,10 @@ public class VisitorZetariano
     }
 
 
-    /* =========================================================
-       ======================== ARGUMENTOS ====================
-       ========================================================= */
 
-    private List<Expresion> construirArgumentos(
-            GrammarZetarianoParser.ListaArgumentosContext ctx) {
+    private List<Expresion> construirArgumentos(GrammarZetarianoParser.ListaArgumentosContext ctx) {
 
-        List<Expresion> argumentos =
-                new ArrayList<>();
+        List<Expresion> argumentos = new ArrayList<>();
 
 
         if (ctx == null) {
@@ -2080,9 +1778,7 @@ public class VisitorZetariano
         for (var expresion :
                 ctx.expresion()) {
 
-            argumentos.add(
-                    (Expresion) visit(expresion)
-            );
+            argumentos.add((Expresion) visit(expresion));
         }
 
 
@@ -2090,94 +1786,48 @@ public class VisitorZetariano
     }
 
 
-    /* =========================================================
-       ========================== LITERAL =====================
-       ========================================================= */
-
     private Literal construirLiteral(
             GrammarZetarianoParser.LiteralContext ctx) {
 
         if (ctx.ENTERO() != null) {
 
-            return new Literal(
-                    linea(ctx),
-                    columna(ctx),
-                    Integer.parseInt(ctx.getText()),
-                    "int"
-            );
+            return new Literal(linea(ctx), columna(ctx), Integer.parseInt(ctx.getText()), "int");
         }
 
 
         if (ctx.DECIMAL() != null) {
 
-            return new Literal(
-                    linea(ctx),
-                    columna(ctx),
-                    Double.parseDouble(ctx.getText()),
-                    "double"
-            );
+            return new Literal(linea(ctx), columna(ctx), Double.parseDouble(ctx.getText()), "double");
         }
 
 
         if (ctx.TRUE() != null) {
 
-            return new Literal(
-                    linea(ctx),
-                    columna(ctx),
-                    true,
-                    "boolean"
-            );
+            return new Literal(linea(ctx), columna(ctx), true, "boolean");
         }
 
 
         if (ctx.FALSE() != null) {
 
-            return new Literal(
-                    linea(ctx),
-                    columna(ctx),
-                    false,
-                    "boolean"
-            );
+            return new Literal(linea(ctx), columna(ctx), false, "boolean");
         }
 
 
         if (ctx.NULL() != null) {
 
-            return new Literal(
-                    linea(ctx),
-                    columna(ctx),
-                    null,
-                    "null"
-            );
+            return new Literal(linea(ctx), columna(ctx), null, "null");
         }
 
 
         if (ctx.COMILLASSIMPLES() != null) {
 
-            return new Literal(
-                    linea(ctx),
-                    columna(ctx),
-                    ctx.getText(),
-                    "char"
-            );
+            return new Literal(linea(ctx), columna(ctx), ctx.getText(), "char");
         }
 
 
-        /*
-         * Comillas dobles.
-         */
-        return new Literal(
-                linea(ctx),
-                columna(ctx),
-                ctx.getText(),
-                "String"
-        );
+
+        return new Literal(linea(ctx), columna(ctx), ctx.getText(), "String");
     }
-
-
-    /* =========================================================
-       ======================== UTILIDADES ====================
-       ========================================================= */
 
     private int linea(ParserRuleContext ctx) {
 

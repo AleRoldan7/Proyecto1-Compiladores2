@@ -4,6 +4,7 @@ import enums.TipoErrorSemantico;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import tablas.InformeTipo;
 import tablas.TablaSimbolos;
 import tablas.TablaTipos;
 
@@ -21,6 +22,16 @@ public class AnalisisContexto {
     private int sizeSwitch = 0;
     private String archivoActual = "desconocido";
     private final List<ErrorSemantico> errores = new ArrayList<>();
+
+    /*
+     * FIX: estado de "clase que se está analizando actualmente".
+     *
+     * Antes vivía como variable local (claseActual) dentro de cada
+     * visitor de ANTLR (VisitorZetariano, VisitorY?, VisitorPigLatin).
+     * Se mueve aquí para que los AnalizadorSemantico<T> sean stateless
+     * y reutilizables entre los tres lenguajes.
+     */
+    private InformeTipo claseActual;
 
     public AnalisisContexto(TablaSimbolos tablaSimbolos, TablaTipos tablaTipos) {
         this.tablaSimbolos = tablaSimbolos;

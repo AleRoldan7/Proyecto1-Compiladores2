@@ -13,6 +13,5 @@ public abstract class NodoAST {
     private int linea;
     private int columna;
 
-    // Programa.java
     public abstract void generarC3D(ContextoC3D contexto);
 }
