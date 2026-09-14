@@ -7,7 +7,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class SentenciaCase extends Sentencia {
+public class SentenciaCase implements Sentencia {
 
     private Expresion valor;
     private Bloque cuerpoCase;

@@ -7,7 +7,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class Asignacion extends Sentencia {
+public class Asignacion extends Expresion {
 
     private Expresion destino;
     private Expresion valor;

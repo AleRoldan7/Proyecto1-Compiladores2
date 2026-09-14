@@ -3,7 +3,8 @@ package semantico.coordinadorsemantico;
 import ast.NodoAST;
 import ast.clases.Atributo;
 import ast.clases.Clase;
-import ast.expresiones.Expresion;
+import ast.expresiones.*;
+import ast.sentencias.Asignacion;
 import ast.tipos.Tipo;
 import semantico.AnalisisContexto;
 import semantico.analizadores.AnalizadorAtributo;
@@ -21,16 +22,13 @@ public class InferirTipoCoordinador {
 
     public InferirTipoCoordinador() {
 
-        // registrar(Literal.class, new InferidorLiteral());
-        // registrar(Identificador.class, new InferidorIdentificador());
-        // registrar(AccesoAtributo.class, new InferidorAccesoAtributo(this));
-        // registrar(AccesoArreglo.class, new InferidorAccesoArreglo(this));
-        // registrar(OperacionBinaria.class, new InferidorOperacionBinaria(this));
-        // registrar(LlamadaFuncion.class, new InferidorLlamadaFuncion(this));
-        // registrar(LlamadaMetodo.class, new InferidorLlamadaMetodo(this));
-        // registrar(CrearArreglo.class, new InferidorCrearArreglo(this));
-        // registrar(CrearObjeto.class, new InferidorCrearObjeto(this));
-        // ... uno por cada subclase de Expresion
+        registrar(Literal.class, new InferidorLiteral());
+        registrar(Identificador.class, new InferidorIdentificador());
+        registrar(ExpresionBinaria.class, new InferirTipoBinario(this));
+        registrar(ExpresionUnaria.class, new InferirTipoUnario(this));
+        registrar(ExpresionTernaria.class, new InferirExpresionTernaria(this));
+        registrar(Asignacion.class, new InferidorAsignacion(this));
+
     }
 
     private <T extends Expresion> void registrar(Class<T> tipo, InferirTipo<T> inferidor) {

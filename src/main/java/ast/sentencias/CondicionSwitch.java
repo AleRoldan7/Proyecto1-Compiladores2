@@ -1,5 +1,6 @@
 package ast.sentencias;
 
+import ast.NodoAST;
 import ast.expresiones.Expresion;
 import c3d.ContextoC3D;
 import lombok.Getter;
@@ -9,7 +10,7 @@ import java.util.List;
 
 @Getter
 @Setter
-public class CondicionSwitch extends Sentencia {
+public class CondicionSwitch extends NodoAST implements Sentencia {
 
     private Expresion expresion;
     private List<SentenciaCase> casos;

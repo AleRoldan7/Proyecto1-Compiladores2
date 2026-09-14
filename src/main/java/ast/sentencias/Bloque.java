@@ -1,5 +1,6 @@
 package ast.sentencias;
 
+import ast.NodoAST;
 import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
@@ -8,7 +9,7 @@ import java.util.List;
 
 @Getter
 @Setter
-public class Bloque extends Sentencia {
+public class Bloque extends NodoAST implements Sentencia {
 
     private List<Sentencia> sentencias;
 
@@ -19,8 +20,6 @@ public class Bloque extends Sentencia {
 
     @Override
     public void generarC3D(ContextoC3D contexto) {
-        for (Sentencia sentencia : sentencias) {
-            sentencia.generarC3D(contexto);
-        }
+
     }
 }

@@ -94,6 +94,17 @@ public class Tipos {
         return INT.equals(n) || DOUBLE.equals(n) || CHAR.equals(n) || BOOLEAN.equals(n);
     }
 
+    public static String base(Tipo tipo) {
+
+        if (tipo == null) {
+            return null;
+        }
+
+        int idx = tipo.getNombre().indexOf('[');
+
+        return idx == -1 ? tipo.getNombre() : tipo.getNombre().substring(0, idx);
+    }
+
     public static String describir(Tipo tipo) {
 
         if (tipo == null) {
@@ -107,5 +118,22 @@ public class Tipos {
         }
 
         return stringBuilder.toString();
+    }
+
+    public static Tipo desdeTexto(int linea, int columna, String nombreCompleto) {
+
+        if (nombreCompleto == null) {
+            return null;
+        }
+
+        int dimensiones = 0;
+        String base = nombreCompleto;
+
+        while (base.endsWith("[]")) {
+            base = base.substring(0, base.length() - 2);
+            dimensiones++;
+        }
+
+        return new Tipo(linea, columna, nombreCompleto, dimensiones > 0, dimensiones);
     }
 }

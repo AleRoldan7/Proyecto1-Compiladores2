@@ -1,5 +1,6 @@
 package ast.sentencias;
 
+import ast.NodoAST;
 import ast.expresiones.Expresion;
 import c3d.ContextoC3D;
 import lombok.Getter;
@@ -9,7 +10,7 @@ import java.util.List;
 
 @Getter
 @Setter
-public class CondicionIf extends Sentencia {
+public class CondicionIf extends NodoAST implements Sentencia {
 
     private Expresion condicion;
     private Bloque bloqueEntonces;
