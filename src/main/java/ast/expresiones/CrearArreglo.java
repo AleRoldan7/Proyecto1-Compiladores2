@@ -24,7 +24,7 @@ public class CrearArreglo extends Expresion {
 
     @Override
     public void generarC3D(ContextoC3D contexto) {
-        // Implementar generación de código C3D para creación de arreglos
+
     }
 
 }

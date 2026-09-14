@@ -1,5 +1,6 @@
 package ast.sentencias;
 
+import ast.NodoAST;
 import ast.expresiones.Expresion;
 import c3d.ContextoC3D;
 import lombok.Getter;
@@ -7,7 +8,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class SentenciaReturn extends Sentencia {
+public class SentenciaReturn extends NodoAST implements Sentencia {
 
     private Expresion expresionReturn;
 

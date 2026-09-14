@@ -5,6 +5,8 @@ import org.antlr.v4.runtime.*;
 import org.compi2.proyecto1compiladores2.GrammarZetarianoLexer;
 import org.compi2.proyecto1compiladores2.GrammarZetarianoParser;
 import semantico.AnalisisContexto;
+import semantico.coordinadorsemantico.AnalizadorSemanticoCoordinador;
+import semantico.coordinadorsemantico.InferirTipoCoordinador;
 import tablas.TablaSimbolos;
 import tablas.TablaTipos;
 import visitor.zetariano.VisitorZetariano;
@@ -18,9 +20,6 @@ public class CompiladorCodigo {
 
         List<String> errores = new ArrayList<>();
 
-        // =====================================================
-        // 1. LEXER
-        // =====================================================
 
         GrammarZetarianoLexer lexer =
                 new GrammarZetarianoLexer(
@@ -52,17 +51,12 @@ public class CompiladorCodigo {
         });
 
 
-        // =====================================================
-        // 2. TOKENS
-        // =====================================================
+
 
         CommonTokenStream tokens =
                 new CommonTokenStream(lexer);
 
 
-        // =====================================================
-        // 3. PARSER
-        // =====================================================
 
         GrammarZetarianoParser parser =
                 new GrammarZetarianoParser(tokens);
@@ -92,16 +86,11 @@ public class CompiladorCodigo {
         });
 
 
-        // =====================================================
-        // 4. PARSE TREE
-        // =====================================================
 
         var arbol = parser.program();
 
 
-        // =====================================================
-        // 5. TABLAS
-        // =====================================================
+
 
         TablaSimbolos tablaSimbolos =
                 new TablaSimbolos();
@@ -110,20 +99,10 @@ public class CompiladorCodigo {
                 new TablaTipos();
 
 
-        // =====================================================
-        // 6. CONTEXTO
-        // =====================================================
 
-        AnalisisContexto contexto =
-                new AnalisisContexto(
-                        tablaSimbolos,
-                        tablaTipos
-                );
+        AnalisisContexto contexto = new AnalisisContexto(tablaSimbolos, tablaTipos);
 
 
-        // =====================================================
-        // 7. VISITOR
-        // =====================================================
 
         VisitorZetariano visitor =
                 new VisitorZetariano(contexto);
@@ -137,22 +116,45 @@ public class CompiladorCodigo {
         } catch (Exception e) {
 
             errores.add(
-                    "Error durante el análisis semántico: "
+                    "Error durante la construcción del AST: "
                             + e.getMessage()
             );
         }
 
 
-        // =====================================================
-        // 8. ERRORES SEMÁNTICOS
-        // =====================================================
+        /*
+         * FIX: análisis semántico conectado. Corre solo si el AST se
+         * construyó bien (si el visitor ya truena, no tiene sentido
+         * analizar un AST a medio construir o null).
+         *
+         * OJO: el visitor TODAVÍA hace sus propias validaciones al
+         * construir el AST (existeEnAmbitoActual, reportarError, etc.),
+         * así que vas a ver errores de "ya fue declarado" duplicados
+         * por ahora — uno del visitor, otro del coordinador. Es
+         * esperado mientras no saquemos esa lógica del visitor.
+         */
+        if (ast != null) {
 
-        //errores.addAll(contexto.getErrores());
+            try {
+
+                InferirTipoCoordinador inferirTipoCoordinador = new InferirTipoCoordinador();
+                AnalizadorSemanticoCoordinador analizadorSemantico =
+                        new AnalizadorSemanticoCoordinador(inferirTipoCoordinador);
+
+                analizadorSemantico.analizar(ast, contexto);
+
+            } catch (Exception e) {
+
+                errores.add(
+                        "Error durante el análisis semántico: "
+                                + e.getMessage()
+                );
+            }
+        }
 
 
-        // =====================================================
-        // 9. RESULTADO
-        // =====================================================
+        contexto.getErrores().forEach(error -> errores.add(error.toString()));
+
 
         boolean correcto = errores.isEmpty();
 

@@ -1,9 +1,10 @@
 package ast.sentencias;
 
+import ast.NodoAST;
 import ast.expresiones.LlamadaFuncion;
 import c3d.ContextoC3D;
 
-public class SentenciaLlamadaFuncion extends Sentencia {
+public class SentenciaLlamadaFuncion extends NodoAST implements  Sentencia {
 
     private LlamadaFuncion llamada;
 

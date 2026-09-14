@@ -28,7 +28,8 @@ public class InferirTipoCoordinador {
         registrar(ExpresionUnaria.class, new InferirTipoUnario(this));
         registrar(ExpresionTernaria.class, new InferirExpresionTernaria(this));
         registrar(Asignacion.class, new InferidorAsignacion(this));
-
+        registrar(AccesoArreglo.class, new InferidorAccesoArreglo(this));
+        registrar(CrearArreglo.class, new InferidorCrearArreglo(this));
     }
 
     private <T extends Expresion> void registrar(Class<T> tipo, InferirTipo<T> inferidor) {

@@ -6,6 +6,8 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.compi2.proyecto1compiladores2.*;
 import semantico.AnalisisContexto;
+import semantico.coordinadorsemantico.AnalizadorSemanticoCoordinador;
+import semantico.coordinadorsemantico.InferirTipoCoordinador;
 import visitor.piglatin.VisitorPigLatin;
 import visitor.piton.LexerIndentacionY;
 import visitor.piton.VisitorPiton;
@@ -20,6 +22,22 @@ import visitor.zetariano.VisitorZetariano;
  * origen.
  */
 public class CompiladorArchivo {
+
+    /*
+     * FIX: coordinadores de análisis semántico. Son stateless entre
+     * archivos (solo son registros Class -> Analizador, no guardan
+     * nada del archivo que se está compilando), así que se crean UNA
+     * vez por CompiladorArchivo y se reutilizan en cada llamada a
+     * analizar(), en vez de recrearlos por archivo.
+     *
+     * Por ahora SOLO se conecta para ZETARIANO, porque es el único
+     * lenguaje con AnalizadorSemanticoCoordinador implementado. Y? y
+     * Pig Latin siguen sin análisis semántico propio — cuando armes
+     * el de esos, se conectan igual en sus respectivos case.
+     */
+    private final InferirTipoCoordinador inferirTipoCoordinador = new InferirTipoCoordinador();
+    private final AnalizadorSemanticoCoordinador analizadorSemanticoZetariano =
+            new AnalizadorSemanticoCoordinador(inferirTipoCoordinador);
 
     /**
      * @param codigo   contenido fuente del archivo
@@ -60,7 +78,23 @@ public class CompiladorArchivo {
 
                 var arbol = parser.program();
                 VisitorZetariano visitor = new VisitorZetariano(contexto);
-                return ejecutarVisitor(() -> visitor.visit(arbol), contexto);
+                NodoAST ast = ejecutarVisitor(() -> visitor.visit(arbol), contexto);
+
+                /*
+                 * FIX: acá faltaba correr el análisis semántico. Antes
+                 * el método terminaba en el 'return' de arriba (comentado
+                 * abajo) y jamás se llegaba a esto.
+                 */
+                if (ast != null) {
+                    try {
+                        analizadorSemanticoZetariano.analizar(ast, contexto);
+                    } catch (Exception e) {
+                        contexto.reportarError(0, 0,
+                                "Error durante el análisis semántico: " + e.getMessage());
+                    }
+                }
+
+                return ast;
             }
 
             case PIG_LATIN: {
@@ -88,6 +122,7 @@ public class CompiladorArchivo {
         try {
             return visita.get();
         } catch (Exception e) {
+            e.printStackTrace(); // TEMPORAL: para ver qué excepción real está tronando el visitor
             contexto.reportarError(0, 0, "Error durante el análisis semántico: " + e.getMessage());
             return null;
         }

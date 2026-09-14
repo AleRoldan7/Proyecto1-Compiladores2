@@ -1,5 +1,6 @@
 package semantico;
 
+import ast.tipos.Tipo;
 import enums.TipoErrorSemantico;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,6 +24,7 @@ public class AnalisisContexto {
     private String archivoActual = "desconocido";
     private final List<ErrorSemantico> errores = new ArrayList<>();
     private InformeTipo claseActual;
+    private Tipo tipoRetorno;
 
     public AnalisisContexto(TablaSimbolos tablaSimbolos, TablaTipos tablaTipos) {
         this.tablaSimbolos = tablaSimbolos;

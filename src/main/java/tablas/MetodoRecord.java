@@ -5,5 +5,5 @@ import ast.tipos.Tipo;
 
 import java.util.List;
 
-public record Metodo(String nombre, Tipo tipoRetorno, List<Parametro> parametros) {
+public record MetodoRecord(String nombre, Tipo tipoRetorno, List<Parametro> parametros) {
 }

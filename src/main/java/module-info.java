@@ -7,7 +7,9 @@ module org.compi2.proyecto1compiladores2 {
     requires org.fxmisc.richtext;
     requires static lombok;
     requires org.testng;
+    requires org.junit.jupiter.api;
 
     opens ui.view to javafx.graphics, javafx.fxml;
     exports ui.view;
+    exports semantico;
 }

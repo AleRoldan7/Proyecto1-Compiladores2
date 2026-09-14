@@ -3,6 +3,8 @@ package semantico.coordinadorsemantico;
 import ast.NodoAST;
 import ast.clases.Atributo;
 import ast.clases.Clase;
+import ast.clases.Constructor;
+import ast.clases.Metodo;
 import ast.declaraciones.DeclaracionArreglo;
 import ast.declaraciones.DeclaracionVariable;
 import ast.sentencias.*;
@@ -34,6 +36,11 @@ public class AnalizadorSemanticoCoordinador {
         registrar(Asignacion.class, new AnalizadorAsignacion(inferirTipoCoordinador));
         registrar(DeclaracionVariable.class, new AnalizadorDeclaracionVariable(inferirTipoCoordinador));
         registrar(DeclaracionArreglo.class, new AnalizadorDeclaracionArreglo(inferirTipoCoordinador));
+        registrar(Metodo.class, new AnalizadorMetodo(this));
+        registrar(Constructor.class, new AnalizadorConstructor(this));
+        registrar(SentenciaExpresion.class, new AnalizadorSentenciaExpresion(inferirTipoCoordinador));
+        registrar(SentenciaReturn.class, new AnalizadorReturn(inferirTipoCoordinador));
+
     }
 
     private <T extends NodoAST> void registrar(Class<T> tipo, AnalizadorSemantico<T> analizador) {

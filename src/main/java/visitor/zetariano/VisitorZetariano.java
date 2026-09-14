@@ -22,6 +22,7 @@ import org.compi2.proyecto1compiladores2.GrammarZetarianoParser;
 
 import semantico.AnalisisContexto;
 import tablas.InformeTipo;
+import tablas.MetodoRecord;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -346,7 +347,7 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
         if (claseActual != null) {
 
             claseActual.agregarMetodo(
-                    new tablas.Metodo(
+                    new MetodoRecord(
                             nombreMetodo,
                             tipoRetorno,
                             parametros

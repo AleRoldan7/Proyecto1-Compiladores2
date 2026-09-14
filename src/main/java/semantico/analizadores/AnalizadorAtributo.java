@@ -34,11 +34,6 @@ public class AnalizadorAtributo implements AnalizadorSemantico<Atributo> {
             contexto.getClaseActual().agregarAtributo(nombre, nodo.getTipo());
         }
 
-        /*
-         * Validar compatibilidad de la inicialización, si la hay.
-         *
-         * Caso tipo simple: private int contador = 5 + 3;
-         */
         Expresion inicializacion = nodo.getInicializacion();
 
         if (inicializacion != null) {
@@ -52,12 +47,6 @@ public class AnalizadorAtributo implements AnalizadorSemantico<Atributo> {
             }
         }
 
-        /*
-         * Caso arreglo: private int[] numeros = {1, 2, 3};
-         *
-         * Cada elemento de valoresIniciales debe ser compatible con el
-         * tipo base (mismo nombre, sin el flag de arreglo).
-         */
         if (nodo.getValoresIniciales() != null) {
 
             Tipo tipoBase = Tipos.simple(

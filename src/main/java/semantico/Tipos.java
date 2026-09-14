@@ -1,6 +1,7 @@
 package semantico;
 
 import ast.tipos.Tipo;
+import tablas.MetodoRecord;
 
 import java.util.Set;
 
@@ -135,5 +136,52 @@ public class Tipos {
         }
 
         return new Tipo(linea, columna, nombreCompleto, dimensiones > 0, dimensiones);
+    }
+
+
+    /**
+     * Construye el Tipo de un arreglo a partir del tipo base y la
+     * cantidad de dimensiones (usado por CrearArreglo y por
+     * AccesoArreglo cuando quedan dimensiones sin indexar).
+     */
+    public static Tipo arreglo(int linea, int columna, String tipoBase, int dimensiones) {
+
+        StringBuilder nombre = new StringBuilder(tipoBase);
+
+        for (int i = 0; i < dimensiones; i++) {
+            nombre.append("[]");
+        }
+
+        return new Tipo(linea, columna, nombre.toString(), true, dimensiones);
+    }
+
+    public static MetodoRecord resolverSobrecarga(
+            java.util.List<MetodoRecord> candidatos, java.util.List<Tipo> tiposArgumentos) {
+
+        for (tablas.MetodoRecord candidato : candidatos) {
+
+            if (candidato.parametros().size() != tiposArgumentos.size()) {
+                continue;
+            }
+
+            boolean todosCompatibles = true;
+
+            for (int i = 0; i < tiposArgumentos.size(); i++) {
+
+                Tipo esperado = candidato.parametros().get(i).getTipoParametro();
+                Tipo real = tiposArgumentos.get(i);
+
+                if (!sonCompatibles(esperado, real)) {
+                    todosCompatibles = false;
+                    break;
+                }
+            }
+
+            if (todosCompatibles) {
+                return candidato;
+            }
+        }
+
+        return null; // ninguna firma matchea
     }
 }
