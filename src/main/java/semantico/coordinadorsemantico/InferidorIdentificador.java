@@ -12,6 +12,19 @@ public class InferidorIdentificador implements InferirTipo<Identificador> {
     @Override
     public Tipo inferir(Identificador nodoIdentificador, AnalisisContexto analisisContexto) {
 
+        if ("this".equals(nodoIdentificador.getNombreIdentificador())) {
+
+            if (analisisContexto.getClaseActual() == null) {
+
+                analisisContexto.reportarError(nodoIdentificador.getLinea(), nodoIdentificador.getColumna(),
+                        "'this' solo puede usarse dentro de una clase");
+                return null;
+            }
+
+            return Tipos.simple(nodoIdentificador.getLinea(), nodoIdentificador.getColumna(),
+                    analisisContexto.getClaseActual().getNombre());
+        }
+
         FilaTabla filaTabla = analisisContexto.getTablaSimbolos().buscar(nodoIdentificador.getNombreIdentificador());
 
         if  (filaTabla == null) {

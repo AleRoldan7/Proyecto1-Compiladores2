@@ -21,6 +21,11 @@ public class AnalizadorConstructor implements AnalizadorSemantico<Constructor> {
     @Override
     public void analizar(Constructor nodoConstructor, AnalisisContexto analisisContexto) {
 
+        if (analisisContexto.getClaseActual() != null && !nodoConstructor.getNombreClase().equals(analisisContexto.getClaseActual().getNombre())) {
+            analisisContexto.reportarError(nodoConstructor.getLinea(), nodoConstructor.getColumna(),
+                    "El nombre del constructor debe coincidir con el de la clase");
+        }
+
         analisisContexto.getTablaSimbolos().entrarAmbito("Constructor");
 
         for (Parametro parametro : nodoConstructor.getParametros()) {

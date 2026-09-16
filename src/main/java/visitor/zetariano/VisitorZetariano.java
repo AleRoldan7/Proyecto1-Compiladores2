@@ -12,29 +12,37 @@ import ast.expresiones.*;
 import ast.sentencias.*;
 import ast.tipos.Tipo;
 
-import enums.Categoria;
-import enums.TipoDato;
-
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.compi2.proyecto1compiladores2.GrammarZetarianoBaseVisitor;
 import org.compi2.proyecto1compiladores2.GrammarZetarianoParser;
 
 import semantico.AnalisisContexto;
-import tablas.InformeTipo;
-import tablas.MetodoRecord;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-
+/**
+ * Construye el AST de Zetariano a partir del árbol de ANTLR.
+ *
+ * IMPORTANTE: este visitor NO hace análisis semántico. No declara símbolos,
+ * no maneja ámbitos, no valida tipos ni reporta errores semánticos — solo
+ * arma los nodos NodoAST con lo que el parser reconoció. Todo el análisis
+ * semántico (redeclaraciones, tipos, resolución de nombres, etc.) corre
+ * después, como segunda pasada, en semantico.coordinadorsemantico.
+ * AnalizadorSemanticoCoordinador (ver CompiladorArchivo), delegando en las
+ * clases de semantico.analizadores / semantico.coordinadorsemantico.
+ *
+ * El campo analisisContexto se conserva solo por si en el futuro se
+ * necesita reportar un error puramente sintáctico durante la construcción
+ * del árbol (por ejemplo una combinación de tokens que el parser aceptó
+ * pero que no tiene sentido armar como nodo). Hoy no se usa para nada
+ * relacionado con símbolos, ámbitos o tipos.
+ */
 public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
 
     private final AnalisisContexto analisisContexto;
-
-    private InformeTipo claseActual;
-
 
     public VisitorZetariano(AnalisisContexto contexto) {
         this.analisisContexto = contexto;
@@ -45,29 +53,13 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
 
         String nombreClase = ctx.ID().getText();
 
-        if (analisisContexto.getTablaTipos().existeTipo(nombreClase)) {
-
-            analisisContexto.reportarError(linea(ctx), columna(ctx), "El tipo '" + nombreClase + "' ya está definido"
-            );
-        }
-
         /*
-         * Registrar la clase antes de analizar su contenido.
-         *
-         * Esto permite que la clase pueda referenciarse a sí misma.
+         * El visitor SOLO construye el árbol. Registrar el tipo, detectar
+         * redefiniciones, manejar ámbitos de la tabla de símbolos y
+         * arrastrar la "clase actual" es responsabilidad semántica: eso
+         * ahora vive en semantico.analizadores.AnalizadorClase, que corre
+         * como segunda pasada sobre este mismo árbol.
          */
-        InformeTipo infoClase =
-                new InformeTipo(nombreClase, TipoDato.OBJETO);
-
-        analisisContexto.getTablaTipos().registrar(infoClase);
-
-        InformeTipo claseAnterior = claseActual;
-        claseActual = infoClase;
-
-        analisisContexto.getTablaSimbolos()
-                .entrarAmbito("Clase " + nombreClase);
-
-
         List<Atributo> atributos = new ArrayList<>();
         List<Constructor> constructores = new ArrayList<>();
         List<Metodo> metodos = new ArrayList<>();
@@ -108,11 +100,6 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
         }
 
 
-        analisisContexto.getTablaSimbolos().salirAmbito();
-
-        claseActual = claseAnterior;
-
-
         return new Clase(
                 linea(ctx),
                 columna(ctx),
@@ -136,34 +123,10 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
 
         String nombre = ctx.ID().getText();
 
-
-        if (analisisContexto.getTablaSimbolos()
-                .existeEnAmbitoActual(nombre)) {
-
-            analisisContexto.reportarError(
-                    linea(ctx),
-                    columna(ctx),
-                    "El atributo '" + nombre
-                            + "' ya fue declarado en esta clase"
-            );
-
-        } else {
-
-            analisisContexto.getTablaSimbolos().declarar(
-                    nombre,
-                    Categoria.ATRIBUTO,
-                    tipo.getNombre(),
-                    "",
-                    linea(ctx)
-            );
-        }
-
-
-        if (claseActual != null) {
-            claseActual.agregarAtributo(nombre, tipo);
-        }
-
-
+        /*
+         * Duplicados y registro en la tabla de tipos: responsabilidad de
+         * semantico.analizadores.AnalizadorAtributo.
+         */
         Atributo atributo = new Atributo(
                 linea(ctx),
                 columna(ctx),
@@ -237,39 +200,21 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
 
         String nombreConstructor = ctx.ID().getText();
 
-
         /*
-         * El constructor debe llamarse igual que la clase.
+         * La regla "el constructor debe llamarse igual que la clase" ahora
+         * se valida en semantico.analizadores.AnalizadorConstructor, que
+         * tiene acceso a la clase actual vía AnalisisContexto.
          */
-        if (claseActual != null &&
-                !nombreConstructor.equals(claseActual.getNombre())) {
-
-            analisisContexto.reportarError(
-                    linea(ctx),
-                    columna(ctx),
-                    "El nombre del constructor debe coincidir "
-                            + "con el de la clase"
-            );
-        }
-
-
         List<Parametro> parametros =
                 construirParametros(ctx.listaParametros());
 
-
-        analisisContexto.getTablaSimbolos()
-                .entrarAmbito("Constructor " + nombreConstructor);
-
-
-        declararParametros(parametros);
-
-
+        /*
+         * Declarar los parámetros en la tabla de símbolos y manejar el
+         * ámbito del constructor también se movió a AnalizadorConstructor
+         * (entra/sale de ámbito antes y después de analizar el cuerpo).
+         */
         Bloque cuerpo =
                 (Bloque) visit(ctx.bloque());
-
-
-        analisisContexto.getTablaSimbolos()
-                .salirAmbito();
 
 
         return new Constructor(
@@ -316,59 +261,15 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
         List<Parametro> parametros =
                 construirParametros(ctx.listaParametros());
 
-
         /*
-         * Registrar método antes del cuerpo.
-         *
-         * Permite recursividad.
+         * Duplicados dentro de la clase, registrar la firma para
+         * sobrecarga/recursividad, ámbito de parámetros y del cuerpo:
+         * todo eso vive ahora en AnalizadorClase (firma) y
+         * AnalizadorMetodo (ámbito + parámetros), corriendo sobre este
+         * mismo nodo Metodo en la segunda pasada.
          */
-        if (analisisContexto.getTablaSimbolos()
-                .existeEnAmbitoActual(nombreMetodo)) {
-
-            analisisContexto.reportarError(
-                    linea(ctx),
-                    columna(ctx),
-                    "El método '" + nombreMetodo
-                            + "' ya fue declarado en esta clase"
-            );
-
-        } else {
-
-            analisisContexto.getTablaSimbolos().declarar(
-                    nombreMetodo,
-                    Categoria.METODO,
-                    tipoRetorno.getNombre(),
-                    parametros.size() + " parámetro(s)",
-                    linea(ctx)
-            );
-        }
-
-
-        if (claseActual != null) {
-
-            claseActual.agregarMetodo(
-                    new MetodoRecord(
-                            nombreMetodo,
-                            tipoRetorno,
-                            parametros
-                    )
-            );
-        }
-
-
-        analisisContexto.getTablaSimbolos()
-                .entrarAmbito("Metodo " + nombreMetodo);
-
-
-        declararParametros(parametros);
-
-
         Bloque cuerpo =
                 (Bloque) visit(ctx.bloque());
-
-
-        analisisContexto.getTablaSimbolos()
-                .salirAmbito();
 
 
         return new Metodo(
@@ -423,37 +324,11 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
     }
 
 
-    private void declararParametros(
-            List<Parametro> parametros) {
-
-        for (Parametro p : parametros) {
-
-            String nombre = p.getNombreParametro();
-
-
-            if (analisisContexto.getTablaSimbolos()
-                    .existeEnAmbitoActual(nombre)) {
-
-                analisisContexto.reportarError(
-                        p.getLinea(),
-                        p.getColumna(),
-                        "Parámetro '" + nombre
-                                + "' duplicado"
-                );
-
-                continue;
-            }
-
-
-            analisisContexto.getTablaSimbolos().declarar(
-                    nombre,
-                    Categoria.PARAMETRO,
-                    p.getTipoParametro().getNombre(),
-                    "",
-                    p.getLinea()
-            );
-        }
-    }
+    /*
+     * declararParametros() se eliminó: la declaración de parámetros en la
+     * tabla de símbolos (con su chequeo de duplicados) ahora la hacen
+     * AnalizadorMetodo y AnalizadorConstructor sobre el nodo ya construido.
+     */
 
 
     /* =========================================================
@@ -519,10 +394,7 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
     public NodoAST visitBloque(
             GrammarZetarianoParser.BloqueContext ctx) {
 
-        analisisContexto.getTablaSimbolos()
-                .entrarAmbito("bloque");
-
-
+        // Ámbito del bloque: lo maneja AnalizadorBloque en la 2da pasada.
         List<Sentencia> sentencias =
                 new ArrayList<>();
 
@@ -535,10 +407,6 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
                 sentencias.add(sentencia);
             }
         }
-
-
-        analisisContexto.getTablaSimbolos()
-                .salirAmbito();
 
 
         return new Bloque(
@@ -563,28 +431,7 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
         String nombre =
                 ctx.ID().getText();
 
-
-        if (analisisContexto.getTablaSimbolos()
-                .existeEnAmbitoActual(nombre)) {
-
-            analisisContexto.reportarError(
-                    linea(ctx),
-                    columna(ctx),
-                    "'" + nombre
-                            + "' ya fue declarado en este ámbito"
-            );
-
-        } else {
-
-            analisisContexto.getTablaSimbolos().declarar(
-                    nombre,
-                    Categoria.VARIABLE,
-                    tipo.getNombre(),
-                    "",
-                    linea(ctx)
-            );
-        }
-
+        // Duplicados y registro en tabla de símbolos: AnalizadorDeclaracionVariable / AnalizadorDeclaracionArreglo.
 
         /*
          * Si es un arreglo:
@@ -1146,15 +993,9 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
         Expresion condicion =
                 (Expresion) visit(ctx.expresion());
 
-
-        analisisContexto.entrarCiclo();
-
-
+        // dentro-de-ciclo (para break/continue) lo controla AnalizadorWhile.
         Bloque cuerpo =
                 (Bloque) visit(ctx.cuerpo());
-
-
-        analisisContexto.salirCiclo();
 
 
         return new CicloWhile(
@@ -1174,15 +1015,8 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
     public NodoAST visitCicloDoWhile(
             GrammarZetarianoParser.CicloDoWhileContext ctx) {
 
-        analisisContexto.entrarCiclo();
-
-
         Bloque cuerpo =
                 (Bloque) visit(ctx.bloque());
-
-
-        analisisContexto.salirCiclo();
-
 
         Expresion condicion =
                 (Expresion) visit(ctx.expresion());
@@ -1205,13 +1039,7 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
     public NodoAST visitCicloFor(
             GrammarZetarianoParser.CicloForContext ctx) {
 
-        /*
-         * El for tiene su propio ámbito.
-         */
-        analisisContexto.getTablaSimbolos()
-                .entrarAmbito("for");
-
-
+        // El ámbito propio del for lo maneja AnalizadorCicloFor.
         Sentencia inicializacion = null;
 
 
@@ -1298,22 +1126,8 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
         }
 
 
-        /*
-         * Entrar al contexto de ciclo.
-         */
-        analisisContexto.entrarCiclo();
-
-
         Bloque cuerpo =
                 (Bloque) visit(ctx.cuerpo());
-
-
-        analisisContexto.salirCiclo();
-
-
-        analisisContexto.getTablaSimbolos()
-                .salirAmbito();
-
 
         return new CicloFor(
                 linea(ctx),
@@ -1337,10 +1151,7 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
         Expresion expresionSwitch =
                 (Expresion) visit(ctx.expresion());
 
-
-        analisisContexto.entrarSwitch();
-
-
+        // dentro-de-switch (para break) lo controla AnalizadorSwitch.
         List<SentenciaCase> casos =
                 new ArrayList<>();
 
@@ -1371,10 +1182,6 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
             bloqueDefault =
                     (Bloque) visit(bloqueCasoDefault);
         }
-
-
-        analisisContexto.salirSwitch();
-
 
         return new CondicionSwitch(
                 linea(ctx),
@@ -1419,10 +1226,7 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
     public NodoAST visitBloqueCaso(
             GrammarZetarianoParser.BloqueCasoContext ctx) {
 
-        analisisContexto.getTablaSimbolos()
-                .entrarAmbito("case");
-
-
+        // Ámbito del case: lo maneja AnalizadorBloque al recorrer el cuerpo del case.
         List<Sentencia> sentencias =
                 new ArrayList<>();
 
@@ -1435,11 +1239,6 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
                 sentencias.add(sentencia);
             }
         }
-
-
-        analisisContexto.getTablaSimbolos()
-                .salirAmbito();
-
 
         return new Bloque(
                 linea(ctx),
@@ -1514,13 +1313,7 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
 
         String nombreClase = ctx.ID().getText();
 
-
-        if (!analisisContexto.getTablaTipos().existeTipo(nombreClase)) {
-
-            analisisContexto.reportarError(linea(ctx), columna(ctx), "La clase '" + nombreClase + "' no está definida");
-        }
-
-
+        // "¿existe la clase?" lo valida InferidorCrearObjeto en la 2da pasada.
         List<Expresion> argumentos = construirArgumentos(ctx.listaArgumentos());
 
         return new CrearObjeto(linea(ctx), columna(ctx), nombreClase, argumentos);
@@ -1644,12 +1437,7 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
 
         String nombre = ctx.ID().getText();
 
-        if (analisisContexto.getTablaSimbolos()
-                .buscar(nombre) == null) {
-
-            analisisContexto.reportarError(linea(ctx), columna(ctx), "Método '" + nombre + "' no declarado en la clase");
-        }
-
+        // "¿existe el método?" lo valida InferidorLlamadaFuncion en la 2da pasada.
         List<Expresion> argumentos = construirArgumentos(ctx.listaArgumentos());
 
         return new LlamadaFuncion(linea(ctx), columna(ctx), nombre, argumentos);
@@ -1682,13 +1470,7 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
 
             String nombreBase = ids.get(0).getText();
 
-
-            if (analisisContexto.getTablaSimbolos().buscar(nombreBase) == null) {
-
-                analisisContexto.reportarError(linea(ctx), columna(ctx), "Variable '" + nombreBase + "' no declarada");
-            }
-
-
+            // "¿existe la variable?" lo valida InferidorIdentificador en la 2da pasada.
             objeto = new Identificador(linea(ctx), columna(ctx), nombreBase);
 
 
@@ -1733,11 +1515,7 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
 
             String nombre = ids.get(cursorId++).getText();
 
-            if (analisisContexto.getTablaSimbolos().buscar(nombre) == null) {
-                analisisContexto.reportarError(linea(ctx), columna(ctx), "Variable '" + nombre + "' no declarada");
-            }
-
-
+            // "¿existe la variable?" lo valida InferidorIdentificador en la 2da pasada.
             actual = new Identificador(linea(ctx), columna(ctx), nombre);
         }
 

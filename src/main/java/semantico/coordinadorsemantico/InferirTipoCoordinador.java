@@ -30,6 +30,10 @@ public class InferirTipoCoordinador {
         registrar(Asignacion.class, new InferidorAsignacion(this));
         registrar(AccesoArreglo.class, new InferidorAccesoArreglo(this));
         registrar(CrearArreglo.class, new InferidorCrearArreglo(this));
+        registrar(AccesoAtributo.class, new InferidorAccesoAtributo(this));
+        registrar(LlamadaFuncion.class, new InferidorLlamadaFuncion(this));
+        registrar(LlamadaMetodo.class, new InferidorLlamadaMetodo(this));
+        registrar(CrearObjeto.class, new InferidorCrearObjeto(this));
     }
 
     private <T extends Expresion> void registrar(Class<T> tipo, InferirTipo<T> inferidor) {
