@@ -1,12 +1,15 @@
 package semantico.coordinadorsemantico;
 
 import ast.NodoAST;
+import ast.Programa;
 import ast.clases.Atributo;
 import ast.clases.Clase;
 import ast.clases.Constructor;
 import ast.clases.Metodo;
 import ast.declaraciones.DeclaracionArreglo;
+import ast.declaraciones.DeclaracionFuncion;
 import ast.declaraciones.DeclaracionVariable;
+import ast.estructuras.Estructura;
 import ast.sentencias.*;
 import semantico.AnalisisContexto;
 import semantico.analizadores.*;
@@ -23,6 +26,9 @@ public class AnalizadorSemanticoCoordinador {
     public AnalizadorSemanticoCoordinador(InferirTipoCoordinador inferirTipoCoordinador) {
 
         registrar(Clase.class, new AnalizadorClase(this));
+        registrar(Programa.class, new AnalizadorPrograma(this));
+        registrar(Estructura.class, new AnalizadorEstructura());
+        registrar(DeclaracionFuncion.class, new AnalizadorFuncion(this));
         registrar(Atributo.class, new AnalizadorAtributo(inferirTipoCoordinador));
 
         registrar(Bloque.class, new AnalizadorBloque(this));

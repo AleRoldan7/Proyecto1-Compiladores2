@@ -10,8 +10,8 @@ import ast.estructuras.InicializacionEstructura;
 import ast.expresiones.*;
 import ast.sentencias.*;
 import ast.tipos.Tipo;
-import enums.Categoria;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.tree.ParseTree;
 import org.compi2.proyecto1compiladores2.GrammarPythonBaseVisitor;
 import org.compi2.proyecto1compiladores2.GrammarPythonParser;
 import semantico.AnalisisContexto;
@@ -19,7 +19,17 @@ import semantico.AnalisisContexto;
 import java.util.ArrayList;
 import java.util.List;
 
-
+/**
+ * Construye el AST de Y? (.y) a partir del arbol de ANTLR.
+ *
+ * NO hace analisis semantico: no declara simbolos, no maneja ambitos y no
+ * reporta errores de tipos. Todo eso corre despues, en la segunda pasada
+ * (AnalizadorSemanticoCoordinador), igual que en VisitorZetariano.
+ *
+ * Las reglas propias de Y? que pide el enunciado -- "solo se definen
+ * estructuras y funciones", "no hay variables globales" -- NO estan aca:
+ * viven en DialectoY y las aplica AnalizadorPrograma.
+ */
 public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
 
     private final AnalisisContexto contexto;
@@ -28,69 +38,46 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
         this.contexto = contexto;
     }
 
-    /**
-     * true si se pudo declarar (no estaba repetido en este ámbito)
-     */
-    private boolean declarar(String nombre, Categoria categoria, String tipo, int linea, int columna) {
-        if (contexto.getTablaSimbolos().existeEnAmbitoActual(nombre)) {
-            contexto.reportarError(linea, columna, "'" + nombre + "' ya fue declarado en este ámbito");
-            return false;
-        }
-        contexto.getTablaSimbolos().declarar(nombre, categoria, tipo, "", linea);
-        return true;
-    }
+    /* =========================================================
+       PROGRAM
+       ========================================================= */
 
     @Override
     public NodoAST visitProgram(GrammarPythonParser.ProgramContext ctx) {
 
         List<Estructura> estructuras = new ArrayList<>();
-        List<Clase> clases = new ArrayList<>(); // Asumo que esto lo tenías en List.of()
+        List<Clase> clases = new ArrayList<>();
         List<DeclaracionFuncion> funciones = new ArrayList<>();
         List<Declaracion> declaracionesGlobales = new ArrayList<>();
 
-        // Iteramos sobre todos los hijos directos del programa
-        for (var hijo : ctx.children) {
+        // FIX: en Y? el ProgramContext solo tiene seccionEstructuras,
+        // seccionFunciones y NEWLINE. No hay SentenciaContext suelto.
+        // Se elimina la rama de SentenciaContext que era código muerto.
 
-            // 1. Procesar sección de estructuras
-            if (hijo instanceof GrammarPythonParser.SeccionEstructurasContext) {
-                GrammarPythonParser.SeccionEstructurasContext ctxEstructuras = (GrammarPythonParser.SeccionEstructurasContext) hijo;
-                for (var e : ctxEstructuras.declaracionEstructura()) {
-                    estructuras.add((Estructura) visit(e));
+        // 1. Sección de estructuras
+        if (ctx.seccionEstructuras() != null) {
+            for (var e : ctx.seccionEstructuras().declaracionEstructura()) {
+                NodoAST nodo = visit(e);
+                if (nodo instanceof Estructura est) {
+                    estructuras.add(est);
                 }
-            }
-
-            // 2. Procesar sección de funciones
-            else if (hijo instanceof GrammarPythonParser.SeccionFuncionesContext) {
-                GrammarPythonParser.SeccionFuncionesContext ctxFunciones = (GrammarPythonParser.SeccionFuncionesContext) hijo;
-                for (var f : ctxFunciones.declaracionFuncion()) {
-                    funciones.add((DeclaracionFuncion) visit(f));
-                }
-            }
-
-            // 3. Procesar sentencias sueltas (variables, asignaciones, ciclos, etc.)
-            else if (hijo instanceof GrammarPythonParser.SentenciaContext) {
-                NodoAST nodoVisitado = visit(hijo);
-
-                // Clasificamos el nodo visitado según su tipo real para meterlo en su lista
-                if (nodoVisitado instanceof Estructura) {
-                    estructuras.add((Estructura) nodoVisitado);
-                } else if (nodoVisitado instanceof DeclaracionFuncion) {
-                    funciones.add((DeclaracionFuncion) nodoVisitado);
-                } else if (nodoVisitado instanceof Clase) {
-                    clases.add((Clase) nodoVisitado);
-                } else if (nodoVisitado instanceof Declaracion) {
-                    declaracionesGlobales.add((Declaracion) nodoVisitado);
-                }
-                // Si es otro tipo de nodo (como una asignación o un ciclo que no hereda de Declaracion),
-                // deberías agregarlo a la lista que corresponda. Si no existe, se ignora.
             }
         }
 
-        // Retornamos el Programa con sus listas llenas
+        // 2. Sección de funciones (obligatoria)
+        if (ctx.seccionFunciones() != null) {
+            for (var f : ctx.seccionFunciones().declaracionFuncion()) {
+                NodoAST nodo = visit(f);
+                if (nodo instanceof DeclaracionFuncion func) {
+                    funciones.add(func);
+                }
+            }
+        }
+
         return new Programa(
                 linea(ctx),
                 columna(ctx),
-                List.of(), // Lista de Strings (¿Imports? o algo similar, se mantiene vacía)
+                List.of(),              // imports (Y? no los tiene)
                 estructuras,
                 clases,
                 funciones,
@@ -98,28 +85,20 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
         );
     }
 
-    @Override
-    public NodoAST visitDeclaracionFuncion(
-            GrammarPythonParser.DeclaracionFuncionContext ctx) {
+    /* =========================================================
+       DECLARACION DE FUNCION
+       ========================================================= */
 
-        // Nombre de la función
+    @Override
+    public NodoAST visitDeclaracionFuncion(GrammarPythonParser.DeclaracionFuncionContext ctx) {
+
         String nombreFuncion = ctx.ID().getText();
 
-        // Tipo de retorno
         Tipo tipoRetorno = null;
-
         if (ctx.tipo() != null) {
             tipoRetorno = construirTipo(ctx.tipo());
         }
 
-        // Se declara ANTES de entrar a su propio ámbito: permite recursividad,
-        // y en Y? todas las funciones viven en el ámbito global.
-        declarar(nombreFuncion, Categoria.FUNCION,
-                tipoRetorno != null ? tipoRetorno.getNombre() : "void", linea(ctx), columna(ctx));
-
-        contexto.getTablaSimbolos().entrarAmbito("Funcion " + nombreFuncion);
-
-        // Parámetros
         List<Parametro> parametros = new ArrayList<>();
 
         if (ctx.listaParametros() != null) {
@@ -130,71 +109,53 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
 
                     Tipo tipo = construirTipo(simple.tipo());
 
-                    parametros.add(
-                            new Parametro(
-                                    linea(simple),
-                                    columna(simple),
-                                    tipo,
-                                    simple.ID().getText(),
-                                    false,
-                                    false
-                            )
-                    );
-                    declarar(simple.ID().getText(), Categoria.PARAMETRO, tipo.getNombre(), linea(simple), columna(simple));
+                    parametros.add(new Parametro(
+                            linea(simple), columna(simple),
+                            tipo,
+                            simple.ID().getText(),
+                            false,
+                            false
+                    ));
 
                 } else if (p instanceof GrammarPythonParser.ParametroArregloContext arreglo) {
 
-                    // Para arreglos: [ ] tipo id — igual, sin tocar el nombre del tipo
-                    Tipo tipo = construirTipo(arreglo.tipo());
+                    Tipo tipoBase = construirTipo(arreglo.tipo());
 
+                    // FIX: crear Tipo con nombre base (sin []) y arreglo=true
                     Tipo tipoArreglo = new Tipo(
-                            linea(arreglo),
-                            columna(arreglo),
-                            tipo.getNombre(),
+                            linea(arreglo), columna(arreglo),
+                            tipoBase.getNombre(),
                             true,
                             1
                     );
 
-                    parametros.add(
-                            new Parametro(
-                                    linea(arreglo),
-                                    columna(arreglo),
-                                    tipoArreglo,
-                                    arreglo.ID().getText(),
-                                    false,
-                                    true
-                            )
-                    );
-                    declarar(arreglo.ID().getText(), Categoria.PARAMETRO, tipo.getNombre(), linea(arreglo), columna(arreglo));
+                    parametros.add(new Parametro(
+                            linea(arreglo), columna(arreglo),
+                            tipoArreglo,
+                            arreglo.ID().getText(),
+                            false,
+                            true
+                    ));
 
                 } else if (p instanceof GrammarPythonParser.ParametroEstructuraContext estructura) {
 
-                    // Para estructuras: { } tipo id
                     Tipo tipo = construirTipo(estructura.tipo());
 
-                    parametros.add(
-                            new Parametro(
-                                    linea(estructura),
-                                    columna(estructura),
-                                    tipo,
-                                    estructura.ID().getText(),
-                                    false,
-                                    false
-                            )
-                    );
-                    declarar(estructura.ID().getText(), Categoria.PARAMETRO, tipo.getNombre(), linea(estructura), columna(estructura));
+                    parametros.add(new Parametro(
+                            linea(estructura), columna(estructura),
+                            tipo,
+                            estructura.ID().getText(),
+                            false,
+                            false
+                    ));
                 }
             }
         }
 
-        // Cuerpo de la función
         Bloque cuerpoFuncion = (Bloque) visit(ctx.bloque());
 
-        contexto.getTablaSimbolos().salirAmbito();
-
         return new DeclaracionFuncion(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 nombreFuncion,
                 tipoRetorno,
                 parametros,
@@ -202,36 +163,46 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
         );
     }
 
+    /* =========================================================
+       DECLARACION DE ESTRUCTURA
+       ========================================================= */
 
     @Override
     public NodoAST visitDeclaracionEstructura(GrammarPythonParser.DeclaracionEstructuraContext ctx) {
+
         List<Campo> campos = new ArrayList<>();
 
-        // Recorrer los campos de la estructura
         for (var campo : ctx.campoEstructura()) {
+
             Tipo tipo = construirTipo(campo.tipo());
 
-            // Verificar si tiene dimensión (tamaño constante, ver GrammarPython.g4: campoEstructura usa 'dimension')
             if (campo.dimension() != null) {
-                // Es un arreglo con tamaño constante — el nombre del tipo NO lleva "[]"
-                int dimensiones = campo.dimension().NUMERO_ENTERO().size();
+
+                int dimensiones = campo.dimension().CORCHETE_ABRE().size();
+
+                // FIX: extraer los tamaños constantes
+                List<Integer> tamanos = new ArrayList<>();
+                for (var num : campo.dimension().NUMERO_ENTERO()) {
+                    tamanos.add(Integer.parseInt(num.getText()));
+                }
+
                 Tipo tipoArreglo = new Tipo(
-                        linea(campo),
-                        columna(campo),
+                        linea(campo), columna(campo),
                         tipo.getNombre(),
                         true,
                         dimensiones
+
                 );
+
                 campos.add(new Campo(
-                        linea(campo),
-                        columna(campo),
+                        linea(campo), columna(campo),
                         tipoArreglo,
                         campo.ID().getText()
                 ));
+
             } else {
                 campos.add(new Campo(
-                        linea(campo),
-                        columna(campo),
+                        linea(campo), columna(campo),
                         tipo,
                         campo.ID().getText()
                 ));
@@ -239,49 +210,60 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
         }
 
         return new Estructura(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 ctx.ID().getText(),
                 campos
         );
     }
 
+    /* =========================================================
+       DECLARACION DE VARIABLE / ARREGLO
+       ========================================================= */
+
     @Override
     public NodoAST visitDeclaracionVariable(GrammarPythonParser.DeclaracionVariableContext ctx) {
+
         Tipo tipo = construirTipo(ctx.tipo());
-        Expresion valorInicial = ctx.expresion() != null ? (Expresion) visit(ctx.expresion()) : null;
+        Expresion valorInicial = ctx.expresion() != null
+                ? (Expresion) visit(ctx.expresion())
+                : null;
 
-        // Verificar si es un arreglo con dimensiones
         if (ctx.dimension() != null) {
-            // FIX: 'dimension' ahora es (CORCHETE_ABRE NUMERO_ENTERO CORCHETE_CIERRA)+ (tamaño
-            // siempre constante, exigido por el enunciado) — ya no tiene expresion(), solo NUMERO_ENTERO()
-            List<Expresion> dims = ctx.dimension().NUMERO_ENTERO().stream()
-                    .map(n -> (Expresion) new Literal(linea(ctx), columna(ctx), Integer.parseInt(n.getText()), "entero"))
-                    .toList();
 
-            // Construir el tipo del arreglo SIN tocar el nombre base
-            // (tipo.getNombre() debe seguir siendo "entero", no "entero[]",
-            // o se rompe cualquier comparación de tipos más adelante)
+            // FIX: 'dimension' ahora es (CORCHETE_ABRE NUMERO_ENTERO CORCHETE_CIERRA)+
+            // Extraer tamaños como lista de literales
+            List<Expresion> dims = new ArrayList<>();
+            List<Integer> tamanos = new ArrayList<>();
+
+            for (var num : ctx.dimension().NUMERO_ENTERO()) {
+                int valor = Integer.parseInt(num.getText());
+                tamanos.add(valor);
+                dims.add(new Literal(
+                        linea(ctx), columna(ctx),
+                        valor,
+                        "entero"
+                ));
+            }
+
             int numDims = ctx.dimension().CORCHETE_ABRE().size();
+
             Tipo tipoArreglo = new Tipo(
-                    linea(ctx),
-                    columna(ctx),
+                    linea(ctx), columna(ctx),
                     tipo.getNombre(),
                     true,
                     numDims
+
             );
 
             List<Expresion> valores = new ArrayList<>();
             if (valorInicial instanceof InicializacionEstructura ie) {
                 valores = ie.getValores();
             } else if (valorInicial != null) {
-                // Si es un solo valor, podría ser inicialización de arreglo con lista
                 valores.add(valorInicial);
             }
 
             return new DeclaracionArreglo(
-                    linea(ctx),
-                    columna(ctx),
+                    linea(ctx), columna(ctx),
                     tipoArreglo,
                     ctx.ID().getText(),
                     dims,
@@ -290,19 +272,21 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
         }
 
         return new DeclaracionVariable(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 tipo,
                 ctx.ID().getText(),
                 valorInicial
         );
     }
 
+    /* =========================================================
+       EXPRESIONES — OPERADORES BINARIOS
+       ========================================================= */
+
     @Override
     public NodoAST visitExpAditiva(GrammarPythonParser.ExpAditivaContext ctx) {
         return new ExpresionBinaria(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 (Expresion) visit(ctx.expresion(0)),
                 ctx.op.getText(),
                 (Expresion) visit(ctx.expresion(1))
@@ -312,8 +296,7 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
     @Override
     public NodoAST visitExpMultiplicativa(GrammarPythonParser.ExpMultiplicativaContext ctx) {
         return new ExpresionBinaria(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 (Expresion) visit(ctx.expresion(0)),
                 ctx.op.getText(),
                 (Expresion) visit(ctx.expresion(1))
@@ -321,99 +304,9 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
     }
 
     @Override
-    public NodoAST visitExpLiteral(GrammarPythonParser.ExpLiteralContext ctx) {
-        return construirLiteral(ctx.literal());
-    }
-
-    /**
-     * FIX: antes visitCasoElegir hacía visit(ctx.literal()) directo, pero no había ningún
-     * visitLiteral(...) sobrescrito — ANTLR caía al 'visitChildren' por defecto, que para
-     * un token suelto devuelve null. Cada 'caso' del switch terminaba con valor = null.
-     */
-    private Literal construirLiteral(GrammarPythonParser.LiteralContext lit) {
-        if (lit.NUMERO_ENTERO() != null) {
-            return new Literal(linea(lit), columna(lit), Integer.parseInt(lit.getText()), "entero");
-        }
-        if (lit.DECIMAL() != null) {
-            return new Literal(linea(lit), columna(lit), Double.parseDouble(lit.getText()), "flotante");
-        }
-        if (lit.VERDADERO() != null || lit.FALSO() != null) {
-            return new Literal(linea(lit), columna(lit), lit.VERDADERO() != null, "bool");
-        }
-        return new Literal(linea(lit), columna(lit), lit.getText(), "cadena");
-    }
-
-    @Override
-    public NodoAST visitExpNegacionLogica(GrammarPythonParser.ExpNegacionLogicaContext ctx) {
-        return new ExpresionUnaria(
-                linea(ctx),
-                columna(ctx),
-                "!",
-                (Expresion) visit(ctx.expresion()),
-                true
-        );
-    }
-
-    @Override
-    public NodoAST visitExpNegativo(GrammarPythonParser.ExpNegativoContext ctx) {
-        return new ExpresionUnaria(
-                linea(ctx),
-                columna(ctx),
-                "-",
-                (Expresion) visit(ctx.expresion()),
-                true
-        );
-    }
-
-    @Override
-    public NodoAST visitExpPreIncremento(GrammarPythonParser.ExpPreIncrementoContext ctx) {
-        return new ExpresionUnaria(
-                linea(ctx),
-                columna(ctx),
-                "++",
-                new Identificador(linea(ctx), columna(ctx), ctx.ID().getText()),
-                true
-        );
-    }
-
-    @Override
-    public NodoAST visitExpPreDecremento(GrammarPythonParser.ExpPreDecrementoContext ctx) {
-        return new ExpresionUnaria(
-                linea(ctx),
-                columna(ctx),
-                "--",
-                new Identificador(linea(ctx), columna(ctx), ctx.ID().getText()),
-                true
-        );
-    }
-
-    @Override
-    public NodoAST visitExpPostIncremento(GrammarPythonParser.ExpPostIncrementoContext ctx) {
-        return new ExpresionUnaria(
-                linea(ctx),
-                columna(ctx),
-                "++",
-                new Identificador(linea(ctx), columna(ctx), ctx.ID().getText()),
-                false
-        );
-    }
-
-    @Override
-    public NodoAST visitExpPostDecremento(GrammarPythonParser.ExpPostDecrementoContext ctx) {
-        return new ExpresionUnaria(
-                linea(ctx),
-                columna(ctx),
-                "--",
-                new Identificador(linea(ctx), columna(ctx), ctx.ID().getText()),
-                false
-        );
-    }
-
-    @Override
     public NodoAST visitExpRelacional(GrammarPythonParser.ExpRelacionalContext ctx) {
         return new ExpresionBinaria(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 (Expresion) visit(ctx.expresion(0)),
                 ctx.op.getText(),
                 (Expresion) visit(ctx.expresion(1))
@@ -423,8 +316,7 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
     @Override
     public NodoAST visitExpIgualdad(GrammarPythonParser.ExpIgualdadContext ctx) {
         return new ExpresionBinaria(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 (Expresion) visit(ctx.expresion(0)),
                 ctx.op.getText(),
                 (Expresion) visit(ctx.expresion(1))
@@ -434,8 +326,7 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
     @Override
     public NodoAST visitExpAnd(GrammarPythonParser.ExpAndContext ctx) {
         return new ExpresionBinaria(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 (Expresion) visit(ctx.expresion(0)),
                 "&&",
                 (Expresion) visit(ctx.expresion(1))
@@ -445,13 +336,80 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
     @Override
     public NodoAST visitExpOr(GrammarPythonParser.ExpOrContext ctx) {
         return new ExpresionBinaria(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 (Expresion) visit(ctx.expresion(0)),
                 "||",
                 (Expresion) visit(ctx.expresion(1))
         );
     }
+
+    /* =========================================================
+       EXPRESIONES — UNARIAS
+       ========================================================= */
+
+    @Override
+    public NodoAST visitExpNegacionLogica(GrammarPythonParser.ExpNegacionLogicaContext ctx) {
+        return new ExpresionUnaria(
+                linea(ctx), columna(ctx),
+                "!",
+                (Expresion) visit(ctx.expresion()),
+                true
+        );
+    }
+
+    @Override
+    public NodoAST visitExpNegativo(GrammarPythonParser.ExpNegativoContext ctx) {
+        return new ExpresionUnaria(
+                linea(ctx), columna(ctx),
+                "-",
+                (Expresion) visit(ctx.expresion()),
+                true
+        );
+    }
+
+    @Override
+    public NodoAST visitExpPreIncremento(GrammarPythonParser.ExpPreIncrementoContext ctx) {
+        return new ExpresionUnaria(
+                linea(ctx), columna(ctx),
+                "++",
+                new Identificador(linea(ctx), columna(ctx), ctx.ID().getText()),
+                true
+        );
+    }
+
+    @Override
+    public NodoAST visitExpPreDecremento(GrammarPythonParser.ExpPreDecrementoContext ctx) {
+        return new ExpresionUnaria(
+                linea(ctx), columna(ctx),
+                "--",
+                new Identificador(linea(ctx), columna(ctx), ctx.ID().getText()),
+                true
+        );
+    }
+
+    @Override
+    public NodoAST visitExpPostIncremento(GrammarPythonParser.ExpPostIncrementoContext ctx) {
+        return new ExpresionUnaria(
+                linea(ctx), columna(ctx),
+                "++",
+                new Identificador(linea(ctx), columna(ctx), ctx.ID().getText()),
+                false
+        );
+    }
+
+    @Override
+    public NodoAST visitExpPostDecremento(GrammarPythonParser.ExpPostDecrementoContext ctx) {
+        return new ExpresionUnaria(
+                linea(ctx), columna(ctx),
+                "--",
+                new Identificador(linea(ctx), columna(ctx), ctx.ID().getText()),
+                false
+        );
+    }
+
+    /* =========================================================
+       EXPRESIONES — PRIMARIAS
+       ========================================================= */
 
     @Override
     public NodoAST visitExpParentesis(GrammarPythonParser.ExpParentesisContext ctx) {
@@ -459,159 +417,56 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
     }
 
     @Override
-    public NodoAST visitCondicional(GrammarPythonParser.CondicionalContext ctx) {
-        // Obtener la condición del if
-        Expresion condicion = (Expresion) visit(ctx.expresion(0));
-        Bloque bloqueEntonces = (Bloque) visit(ctx.bloque(0));
+    public NodoAST visitExpLiteral(GrammarPythonParser.ExpLiteralContext ctx) {
+        return construirLiteral(ctx.literal());
+    }
 
-        // Procesar else-if
-        List<CondicionIf> listaElseIf = new ArrayList<>();
-        int cantidadElseIf = ctx.expresion().size() - 1;
+    @Override
+    public NodoAST visitExpAcceso(GrammarPythonParser.ExpAccesoContext ctx) {
+        return visit(ctx.accesoVariable());
+    }
 
-        for (int i = 0; i < cantidadElseIf; i++) {
-            Expresion condElseIf = (Expresion) visit(ctx.expresion(i + 1));
-            Bloque bloqueElseIf = (Bloque) visit(ctx.bloque(i + 1));
-            listaElseIf.add(new CondicionIf(
-                    linea(ctx),
-                    columna(ctx),
-                    condElseIf,
-                    bloqueElseIf,
-                    List.of(),
-                    null
-            ));
-        }
+    @Override
+    public NodoAST visitExpLlamada(GrammarPythonParser.ExpLlamadaContext ctx) {
+        return visit(ctx.llamadaFuncion());
+    }
 
-        // Procesar else (contrario)
-        Bloque bloqueElse = null;
-        int cantidadBloques = ctx.bloque().size();
-        int cantidadExpresiones = ctx.expresion().size();
-
-        if (cantidadBloques > cantidadExpresiones) {
-            bloqueElse = (Bloque) visit(ctx.bloque(cantidadBloques - 1));
-        }
-
-        return new CondicionIf(
-                linea(ctx),
-                columna(ctx),
-                condicion,
-                bloqueEntonces,
-                listaElseIf,
-                bloqueElse
+    @Override
+    public NodoAST visitExpLeer(GrammarPythonParser.ExpLeerContext ctx) {
+        return new LlamadaFuncion(
+                linea(ctx), columna(ctx),
+                "leer",
+                List.of()
         );
     }
 
     @Override
-    public NodoAST visitSwitchCase(GrammarPythonParser.SwitchCaseContext ctx) {
-        Expresion expresionSwitch = (Expresion) visit(ctx.expresion());
+    public NodoAST visitExpListaValores(GrammarPythonParser.ExpListaValoresContext ctx) {
 
-        List<SentenciaCase> casos = new ArrayList<>();
+        List<Expresion> valores = new ArrayList<>();
 
-        for (var caso : ctx.casoElegir()) {
-            NodoAST nodo = visit(caso);
-            if (nodo instanceof SentenciaCase sentenciaCase) {
-                casos.add(sentenciaCase);
+        GrammarPythonParser.ListaValoresContext listaValores = ctx.listaValores();
+
+        if (listaValores != null) {
+            for (var expr : listaValores.expresion()) {
+                valores.add((Expresion) visit(expr));
             }
         }
 
-        Bloque bloqueDefault = null;
-        if (ctx.SIEMPRE() != null) {
-            // ctx.bloqueCaso() devuelve un solo BloqueCasoContext (el del default)
-            bloqueDefault = (Bloque) visit(ctx.bloqueCaso());
-        }
-
-        return new CondicionSwitch(
-                linea(ctx),
-                columna(ctx),
-                expresionSwitch,
-                casos,
-                bloqueDefault
+        return new InicializacionEstructura(
+                linea(ctx), columna(ctx),
+                null,   // el nombre del tipo se resuelve en análisis semántico
+                valores
         );
     }
 
-    @Override
-    public NodoAST visitCasoElegir(GrammarPythonParser.CasoElegirContext ctx) {
-        Expresion valor = construirLiteral(ctx.literal());
-        Bloque cuerpo = (Bloque) visit(ctx.bloqueCaso());
-
-        return new SentenciaCase(
-                linea(ctx),
-                columna(ctx),
-                valor,
-                cuerpo
-        );
-    }
-
-    @Override
-    public NodoAST visitBloqueCaso(GrammarPythonParser.BloqueCasoContext ctx) {
-        List<Sentencia> sentencias = new ArrayList<>();
-
-        for (var s : ctx.sentencia()) {
-            NodoAST nodo = visit(s);
-            if (nodo instanceof Sentencia sentencia) {
-                sentencias.add(sentencia);
-            }
-        }
-
-        // El break está en la gramática pero no se incluye en el AST
-        // porque ya está como parte del bloque
-
-        return new Bloque(
-                linea(ctx),
-                columna(ctx),
-                sentencias
-        );
-    }
-
-    @Override
-    public NodoAST visitBloque(GrammarPythonParser.BloqueContext ctx) {
-        List<Sentencia> sentencias = new ArrayList<>();
-        for (var s : ctx.sentencia()) {
-            NodoAST nodo = visit(s);
-            if (nodo instanceof Sentencia sentencia) {
-                sentencias.add(sentencia);
-            }
-        }
-        return new Bloque(
-                linea(ctx),
-                columna(ctx),
-                sentencias
-        );
-    }
-
-    @Override
-    public NodoAST visitSentDeclaracionVariable(GrammarPythonParser.SentDeclaracionVariableContext ctx) {
-        return visit(ctx.declaracionVariable());
-    }
-
-    @Override
-    public NodoAST visitSentAsignacion(GrammarPythonParser.SentAsignacionContext ctx) {
-        return visit(ctx.asignacion());
-    }
-
-    @Override
-    public NodoAST visitAsignacion(GrammarPythonParser.AsignacionContext ctx) {
-        Expresion destino = (Expresion) visit(ctx.accesoVariable());
-        Expresion valor = (Expresion) visit(ctx.expresion());
-
-        return new Asignacion(
-                linea(ctx),
-                columna(ctx),
-                destino,
-                valor
-        );
-    }
-
-    @Override
-    public NodoAST visitSentLlamadaFuncion(GrammarPythonParser.SentLlamadaFuncionContext ctx) {
-        return new SentenciaExpresion(
-                linea(ctx),
-                columna(ctx),
-                (Expresion) visit(ctx.llamadaFuncion())
-        );
-    }
+    /* =========================================================
+       LLAMADA A FUNCION
+       ========================================================= */
 
     @Override
     public NodoAST visitLlamadaFuncion(GrammarPythonParser.LlamadaFuncionContext ctx) {
+
         String nombre = ctx.ID().getText();
         List<Expresion> argumentos = new ArrayList<>();
 
@@ -622,50 +477,123 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
         }
 
         return new LlamadaFuncion(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 nombre,
                 argumentos
         );
     }
 
+    /* =========================================================
+       ACCESO A VARIABLE
+       ========================================================= */
+
+    @Override
+    public NodoAST visitAccesoVariable(GrammarPythonParser.AccesoVariableContext ctx) {
+
+        List<String> ids = new ArrayList<>();
+        for (var id : ctx.ID()) {
+            ids.add(id.getText());
+        }
+
+        // Acceso simple
+        if (ids.size() == 1 && ctx.expresion().isEmpty()) {
+            return new Identificador(linea(ctx), columna(ctx), ids.get(0));
+        }
+
+        // Acceso compuesto
+        Expresion actual = new Identificador(linea(ctx), columna(ctx), ids.get(0));
+
+        int idIndex = 1;
+        int exprIndex = 0;
+
+        for (int i = 1; i < ctx.getChildCount(); i++) {
+
+            ParseTree hijo = ctx.getChild(i);
+            String texto = hijo.getText();
+
+            if (texto.equals(".") && idIndex < ids.size()) {
+                actual = new AccesoAtributo(
+                        linea(ctx), columna(ctx),
+                        actual,
+                        ids.get(idIndex++)
+                );
+            } else if (texto.equals("[") && exprIndex < ctx.expresion().size()) {
+                Expresion indice = (Expresion) visit(ctx.expresion().get(exprIndex++));
+                actual = new AccesoArreglo(
+                        linea(ctx), columna(ctx),
+                        actual,
+                        List.of(indice)
+                );
+            }
+        }
+
+        return actual;
+    }
+
+    /* =========================================================
+       ASIGNACION
+       ========================================================= */
+
+    @Override
+    public NodoAST visitSentAsignacion(GrammarPythonParser.SentAsignacionContext ctx) {
+        return visit(ctx.asignacion());
+    }
+
+    @Override
+    public NodoAST visitAsignacion(GrammarPythonParser.AsignacionContext ctx) {
+
+        Expresion destino = (Expresion) visit(ctx.accesoVariable());
+        Expresion valor = (Expresion) visit(ctx.expresion());
+
+        return new Asignacion(
+                linea(ctx), columna(ctx),
+                destino,
+                valor
+        );
+    }
+
+    /* =========================================================
+       INCREMENTO / DECREMENTO COMO SENTENCIA
+       ========================================================= */
+
     @Override
     public NodoAST visitSentIncrDecrPostfijo(GrammarPythonParser.SentIncrDecrPostfijoContext ctx) {
+
         Expresion destino = (Expresion) visit(ctx.accesoVariable());
         String operador = ctx.INCREMENTO() != null ? "++" : "--";
 
-        ExpresionUnaria incremento = new ExpresionUnaria(
-                linea(ctx),
-                columna(ctx),
-                operador,
-                destino,
-                false
-        );
-
         return new SentenciaExpresion(
-                linea(ctx),
-                columna(ctx),
-                incremento
+                linea(ctx), columna(ctx),
+                new ExpresionUnaria(linea(ctx), columna(ctx), operador, destino, false)
         );
     }
 
     @Override
     public NodoAST visitSentIncrDecrPrefijo(GrammarPythonParser.SentIncrDecrPrefijoContext ctx) {
+
         Expresion destino = (Expresion) visit(ctx.accesoVariable());
         String operador = ctx.INCREMENTO() != null ? "++" : "--";
 
-        ExpresionUnaria incremento = new ExpresionUnaria(
-                linea(ctx),
-                columna(ctx),
-                operador,
-                destino,
-                true
-        );
-
         return new SentenciaExpresion(
-                linea(ctx),
-                columna(ctx),
-                incremento
+                linea(ctx), columna(ctx),
+                new ExpresionUnaria(linea(ctx), columna(ctx), operador, destino, true)
+        );
+    }
+
+    /* =========================================================
+       SENTENCIAS DELEGADAS
+       ========================================================= */
+
+    @Override
+    public NodoAST visitSentDeclaracionVariable(GrammarPythonParser.SentDeclaracionVariableContext ctx) {
+        return visit(ctx.declaracionVariable());
+    }
+
+    @Override
+    public NodoAST visitSentLlamadaFuncion(GrammarPythonParser.SentLlamadaFuncionContext ctx) {
+        return new SentenciaExpresion(
+                linea(ctx), columna(ctx),
+                (Expresion) visit(ctx.llamadaFuncion())
         );
     }
 
@@ -676,18 +604,13 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
 
     @Override
     public NodoAST visitImprimirStmt(GrammarPythonParser.ImprimirStmtContext ctx) {
+
         List<Expresion> argumentos = new ArrayList<>();
         argumentos.add((Expresion) visit(ctx.expresion()));
 
         return new SentenciaExpresion(
-                linea(ctx),
-                columna(ctx),
-                new LlamadaFuncion(
-                        linea(ctx),
-                        columna(ctx),
-                        "imprimir",
-                        argumentos
-                )
+                linea(ctx), columna(ctx),
+                new LlamadaFuncion(linea(ctx), columna(ctx), "imprimir", argumentos)
         );
     }
 
@@ -699,54 +622,29 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
     @Override
     public NodoAST visitLeerStmt(GrammarPythonParser.LeerStmtContext ctx) {
         return new SentenciaExpresion(
-                linea(ctx),
-                columna(ctx),
-                new LlamadaFuncion(
-                        linea(ctx),
-                        columna(ctx),
-                        "leer",
-                        List.of()
-                )
-        );
-    }
-
-    @Override
-    public NodoAST visitExpLeer(GrammarPythonParser.ExpLeerContext ctx) {
-        return new LlamadaFuncion(
-                linea(ctx),
-                columna(ctx),
-                "leer",
-                List.of()
+                linea(ctx), columna(ctx),
+                new LlamadaFuncion(linea(ctx), columna(ctx), "leer", List.of())
         );
     }
 
     @Override
     public NodoAST visitSentRetorno(GrammarPythonParser.SentRetornoContext ctx) {
+
         Expresion valor = ctx.expresion() != null
                 ? (Expresion) visit(ctx.expresion())
                 : null;
 
-        return new SentenciaReturn(
-                linea(ctx),
-                columna(ctx),
-                valor
-        );
+        return new SentenciaReturn(linea(ctx), columna(ctx), valor);
     }
 
     @Override
     public NodoAST visitSentRomper(GrammarPythonParser.SentRomperContext ctx) {
-        return new SentenciaBreak(
-                linea(ctx),
-                columna(ctx)
-        );
+        return new SentenciaBreak(linea(ctx), columna(ctx));
     }
 
     @Override
     public NodoAST visitSentContinuar(GrammarPythonParser.SentContinuarContext ctx) {
-        return new SentenciaContinue(
-                linea(ctx),
-                columna(ctx)
-        );
+        return new SentenciaContinue(linea(ctx), columna(ctx));
     }
 
     @Override
@@ -765,40 +663,208 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
     }
 
     @Override
+    public NodoAST visitSentCicloMientras(GrammarPythonParser.SentCicloMientrasContext ctx) {
+        return visit(ctx.cicloMientras());
+    }
+
+    @Override
+    public NodoAST visitSentEstructuraLocal(GrammarPythonParser.SentEstructuraLocalContext ctx) {
+        return visit(ctx.declaracionEstructura());
+    }
+
+    /* =========================================================
+       BLOQUES
+       ========================================================= */
+
+    @Override
+    public NodoAST visitBloque(GrammarPythonParser.BloqueContext ctx) {
+
+        List<Sentencia> sentencias = new ArrayList<>();
+
+        for (var s : ctx.sentencia()) {
+            NodoAST nodo = visit(s);
+            if (nodo instanceof Sentencia sentencia) {
+                sentencias.add(sentencia);
+            }
+        }
+
+        return new Bloque(linea(ctx), columna(ctx), sentencias);
+    }
+
+    @Override
+    public NodoAST visitBloqueCaso(GrammarPythonParser.BloqueCasoContext ctx) {
+
+        List<Sentencia> sentencias = new ArrayList<>();
+
+        for (var s : ctx.sentencia()) {
+            NodoAST nodo = visit(s);
+            if (nodo instanceof Sentencia sentencia) {
+                sentencias.add(sentencia);
+            }
+        }
+
+        return new Bloque(linea(ctx), columna(ctx), sentencias);
+    }
+
+    /* =========================================================
+       CONDICIONAL
+       ========================================================= */
+
+    @Override
+    public NodoAST visitCondicional(GrammarPythonParser.CondicionalContext ctx) {
+
+        Expresion condicion = (Expresion) visit(ctx.expresion(0));
+        Bloque bloqueEntonces = (Bloque) visit(ctx.bloque(0));
+
+        int cantidadExpresiones = ctx.expresion().size();
+        int cantidadBloques = ctx.bloque().size();
+
+        // FIX: cantidadElseIf = cantidad de 'sino' = expresiones - 1
+        int cantidadElseIf = cantidadExpresiones - 1;
+
+        List<CondicionIf> listaElseIf = new ArrayList<>();
+
+        for (int i = 0; i < cantidadElseIf; i++) {
+
+            Expresion condElseIf = (Expresion) visit(ctx.expresion(i + 1));
+            Bloque bloqueElseIf = (Bloque) visit(ctx.bloque(i + 1));
+
+            listaElseIf.add(new CondicionIf(
+                    linea(ctx), columna(ctx),
+                    condElseIf,
+                    bloqueElseIf,
+                    List.of(),
+                    null
+            ));
+        }
+
+        // FIX: hay 'contrario' si hay más bloques que expresiones
+        Bloque bloqueElse = null;
+        if (cantidadBloques > cantidadExpresiones) {
+            bloqueElse = (Bloque) visit(ctx.bloque(cantidadBloques - 1));
+        }
+
+        return new CondicionIf(
+                linea(ctx), columna(ctx),
+                condicion,
+                bloqueEntonces,
+                listaElseIf,
+                bloqueElse
+        );
+    }
+
+    /* =========================================================
+       SWITCH
+       ========================================================= */
+
+    @Override
+    public NodoAST visitSwitchCase(GrammarPythonParser.SwitchCaseContext ctx) {
+
+        Expresion expresionSwitch = (Expresion) visit(ctx.expresion());
+
+        List<SentenciaCase> casos = new ArrayList<>();
+
+        for (var caso : ctx.casoElegir()) {
+            NodoAST nodo = visit(caso);
+            if (nodo instanceof SentenciaCase sc) {
+                casos.add(sc);
+            }
+        }
+
+        Bloque bloqueDefault = null;
+
+        // FIX: ctx.bloqueCaso() devuelve un único contexto (el del SIEMPRE)
+        if (ctx.SIEMPRE() != null && ctx.bloqueCaso() != null) {
+            bloqueDefault = (Bloque) visit(ctx.bloqueCaso());
+        }
+
+        return new CondicionSwitch(
+                linea(ctx), columna(ctx),
+                expresionSwitch,
+                casos,
+                bloqueDefault
+        );
+    }
+
+    @Override
+    public NodoAST visitCasoElegir(GrammarPythonParser.CasoElegirContext ctx) {
+
+        Expresion valor = construirLiteral(ctx.literal());
+        Bloque cuerpo = (Bloque) visit(ctx.bloqueCaso());
+
+        return new SentenciaCase(
+                linea(ctx), columna(ctx),
+                valor,
+                cuerpo
+        );
+    }
+
+    /* =========================================================
+       CICLOS
+       ========================================================= */
+
+    @Override
     public NodoAST visitCicloPara(GrammarPythonParser.CicloParaContext ctx) {
+
         Sentencia inicializacion = null;
 
-        // Inicialización
         if (ctx.declaracionVariable() != null) {
             NodoAST nodo = visit(ctx.declaracionVariable());
-            if (nodo instanceof Sentencia sentencia) {
-                inicializacion = sentencia;
-            }
+            if (nodo instanceof Sentencia sentencia) inicializacion = sentencia;
         } else if (ctx.asignacion() != null) {
             NodoAST nodo = visit(ctx.asignacion());
-            if (nodo instanceof Sentencia sentencia) {
-                inicializacion = sentencia;
+            if (nodo instanceof Sentencia sentencia) inicializacion = sentencia;
+        }
+
+        // FIX: la gramática tiene (declaracionVariable | asignacion)? PUNTO_COMA
+        // expresion? PUNTO_COMA expresion?. Si solo hay un 'expresion', puede
+        // ser la condición O el incremento. Para distinguirlos hay que revisar
+        // cuántos PUNTO_COMA hay antes/después. La forma robusta es mirar los
+        // hijos en orden.
+        //
+        // Convención: los hijos van en orden:
+        //   [declaracionVariable | asignacion]? ';' [expresion]? ';' [expresion]?
+        //
+        // Vamos a contar cuántos PUNTO_COMA hay y en qué posición aparece cada
+        // expresion respecto a ellos.
+
+        Expresion condicion = null;
+        Expresion incremento = null;
+
+        List<ParseTree> hijos = ctx.children;
+        int puntoYComaVistos = 0;
+
+        for (ParseTree hijo : hijos) {
+
+            String texto = hijo.getText();
+
+            if (texto.equals(";")) {
+                puntoYComaVistos++;
+                continue;
+            }
+
+            if (hijo instanceof GrammarPythonParser.ExpresionContext expCtx) {
+
+                Expresion exp = (Expresion) visit(expCtx);
+
+                if (puntoYComaVistos == 0) {
+                    // Está antes del primer ';', pero ya se procesó la
+                    // declaración/asignación. En la práctica no debería pasar.
+                    condicion = exp;
+                } else if (puntoYComaVistos == 1) {
+                    // Entre el primer y segundo ';' → condición
+                    condicion = exp;
+                } else {
+                    // Después del segundo ';' → incremento
+                    incremento = exp;
+                }
             }
         }
 
-        // Condición
-        Expresion condicion = null;
-        if (!ctx.expresion().isEmpty()) {
-            condicion = (Expresion) visit(ctx.expresion().get(0));
-        }
-
-        // Incremento
-        Expresion incremento = null;
-        if (ctx.expresion().size() > 1) {
-            incremento = (Expresion) visit(ctx.expresion().get(1));
-        }
-
-        // Cuerpo
         Bloque cuerpo = (Bloque) visit(ctx.bloque());
 
         return new CicloFor(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 inicializacion,
                 condicion,
                 incremento,
@@ -807,18 +873,13 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
     }
 
     @Override
-    public NodoAST visitSentCicloMientras(GrammarPythonParser.SentCicloMientrasContext ctx) {
-        return visit(ctx.cicloMientras());
-    }
-
-    @Override
     public NodoAST visitCicloWhile(GrammarPythonParser.CicloWhileContext ctx) {
+
         Expresion condicion = (Expresion) visit(ctx.expresion());
         Bloque cuerpo = (Bloque) visit(ctx.bloque());
 
         return new CicloWhile(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 condicion,
                 cuerpo
         );
@@ -826,107 +887,71 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
 
     @Override
     public NodoAST visitCicloDoWhile(GrammarPythonParser.CicloDoWhileContext ctx) {
+
         Bloque cuerpo = (Bloque) visit(ctx.bloque());
         Expresion condicion = (Expresion) visit(ctx.expresion());
 
         return new CicloDoWhile(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 cuerpo,
                 condicion
         );
     }
 
-    @Override
-    public NodoAST visitSentEstructuraLocal(GrammarPythonParser.SentEstructuraLocalContext ctx) {
-        return visit(ctx.declaracionEstructura());
-    }
+    /* =========================================================
+       HELPERS
+       ========================================================= */
 
-    @Override
-    public NodoAST visitExpAcceso(GrammarPythonParser.ExpAccesoContext ctx) {
-        return visit(ctx.accesoVariable());
-    }
+    private Literal construirLiteral(GrammarPythonParser.LiteralContext lit) {
 
-    @Override
-    public NodoAST visitAccesoVariable(GrammarPythonParser.AccesoVariableContext ctx) {
-        // Procesar acceso a variable con posibles puntos e índices
-        List<String> ids = new ArrayList<>();
-        for (var id : ctx.ID()) {
-            ids.add(id.getText());
-        }
-
-        // Si solo hay un ID, es acceso simple
-        if (ids.size() == 1 && ctx.expresion().isEmpty()) {
-            return new Identificador(
-                    linea(ctx),
-                    columna(ctx),
-                    ids.get(0)
+        if (lit.NUMERO_ENTERO() != null) {
+            return new Literal(
+                    linea(lit), columna(lit),
+                    Integer.parseInt(lit.getText()),
+                    "entero"
             );
         }
 
-        // Construir acceso compuesto
-        Expresion actual = new Identificador(
-                linea(ctx),
-                columna(ctx),
-                ids.get(0)
-        );
-
-        int idIndex = 1;
-        int exprIndex = 0;
-
-        for (int i = 1; i < ctx.getChildCount(); i++) {
-            String texto = ctx.getChild(i).getText();
-
-            if (texto.equals(".") && idIndex < ids.size()) {
-                actual = new AccesoAtributo(
-                        linea(ctx),
-                        columna(ctx),
-                        actual,
-                        ids.get(idIndex++)
-                );
-            } else if (texto.equals("[") && exprIndex < ctx.expresion().size()) {
-                Expresion indice = (Expresion) visit(ctx.expresion().get(exprIndex++));
-                actual = new AccesoArreglo(
-                        linea(ctx),
-                        columna(ctx),
-                        actual,
-                        List.of(indice)
-                );
-            }
+        if (lit.DECIMAL() != null) {
+            return new Literal(
+                    linea(lit), columna(lit),
+                    Double.parseDouble(lit.getText()),
+                    "flotante"
+            );
         }
 
-        return actual;
-    }
-
-    @Override
-    public NodoAST visitExpListaValores(GrammarPythonParser.ExpListaValoresContext ctx) {
-        List<Expresion> valores = new ArrayList<>();
-
-        // ctx.listaValores() devuelve el contexto de la lista de valores
-        GrammarPythonParser.ListaValoresContext listaValores = ctx.listaValores();
-
-        if (listaValores != null) {
-            // listaValores.expresion() devuelve la lista de expresiones
-            for (var expr : listaValores.expresion()) {
-                valores.add((Expresion) visit(expr));
-            }
+        if (lit.VERDADERO() != null || lit.FALSO() != null) {
+            return new Literal(
+                    linea(lit), columna(lit),
+                    lit.VERDADERO() != null,
+                    "bool"
+            );
         }
 
-        return new InicializacionEstructura(
-                linea(ctx),
-                columna(ctx),
-                null,  // El nombre del tipo se determinará en análisis semántico
-                valores
+        if (lit.COMILLASSIMPLES() != null) {
+            return new Literal(
+                    linea(lit), columna(lit),
+                    lit.getText(),
+                    "caracter"
+            );
+        }
+
+        // COMILLAS (cadena)
+        return new Literal(
+                linea(lit), columna(lit),
+                lit.getText(),
+                "cadena"
         );
     }
 
     private Tipo construirTipo(GrammarPythonParser.TipoContext ctx) {
+
         if (ctx == null) {
             return null;
         }
+
         return new Tipo(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 ctx.getText(),
                 false,
                 0

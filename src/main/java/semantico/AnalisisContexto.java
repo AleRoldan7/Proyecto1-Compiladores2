@@ -1,6 +1,7 @@
 package semantico;
 
 import ast.tipos.Tipo;
+import enums.TipoArchivo;
 import enums.TipoErrorSemantico;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -8,9 +9,12 @@ import lombok.Setter;
 import tablas.InformeTipo;
 import tablas.TablaSimbolos;
 import tablas.TablaTipos;
+import semantico.dialecto.Dialecto;
+import semantico.dialecto.Dialectos;
 
 import java.util.ArrayList;
 import java.util.List;
+
 
 @Getter
 @Setter
@@ -26,9 +30,62 @@ public class AnalisisContexto {
     private InformeTipo claseActual;
     private Tipo tipoRetorno;
 
+    /*
+     * Dialecto del archivo que se está analizando AHORA. Cambia con cada
+     * archivo del proyecto (lo setea CompiladorArchivo), mientras que la
+     * TablaSimbolos/TablaTipos siguen siendo compartidas entre los tres
+     * lenguajes. Así un mismo analizador atiende a los tres, y le pregunta
+     * al dialecto lo que es específico del lenguaje.
+     */
+    private Dialecto dialecto = Dialectos.ZETARIANO;
+
     public AnalisisContexto(TablaSimbolos tablaSimbolos, TablaTipos tablaTipos) {
         this.tablaSimbolos = tablaSimbolos;
         this.tablaTipos = tablaTipos;
+    }
+
+    /**
+     * Crea un contexto NUEVO con sus PROPIAS tablas de símbolos y tipos.
+     *
+     * Cada archivo (.z, .y, .pig) vive en su propio espacio de nombres,
+     * así que dos archivos pueden definir una clase 'Persona' sin que
+     * eso sea un error.
+     */
+    public static AnalisisContexto paraArchivo(String nombreArchivo, TipoArchivo tipo) {
+
+        AnalisisContexto ctx = new AnalisisContexto();
+        ctx.setArchivoActual(nombreArchivo);
+        ctx.setDialecto(Dialectos.de(tipo));
+        ctx.setTablaSimbolos(new TablaSimbolos());
+        ctx.setTablaTipos(new TablaTipos());
+
+        return ctx;
+    }
+
+    /**
+     * Importa los TIPOS PÚBLICOS de otro archivo a este contexto.
+     *
+     * Se usa cuando Pig Latin hace:
+     *     import carpeta.Objeto1.z
+     *     import carpeta.Funciones.y
+     *
+     * Solo se copian:
+     *   - De un .z: la clase pública (con sus métodos y atributos públicos).
+     *   - De un .y: las estructuras y las funciones.
+     */
+    public void importarDe(AnalisisContexto otro) {
+
+        if (otro == null || otro.getTablaTipos() == null) {
+            return;
+        }
+
+        // Copiar los tipos públicos (estructuras, clases)
+        this.tablaTipos.importarDe(otro.getTablaTipos());
+
+        // Copiar las funciones globales (categoría FUNCION)
+        if (otro.getTablaSimbolos() != null) {
+            this.tablaSimbolos.importarDe(otro.getTablaSimbolos());
+        }
     }
 
     public void entrarCiclo() {
@@ -53,6 +110,24 @@ public class AnalisisContexto {
 
     public boolean dentroDeSwitch() {
         return sizeSwitch > 0;
+    }
+
+    /**
+     * Regla del lenguaje actual: reporta el error y devuelve false si la
+     * construcción no está permitida en este dialecto.
+     *
+     * Uso típico dentro de un analizador compartido:
+     *
+     *   if (!contexto.exigir(contexto.getDialecto().permiteVariablesGlobales(),
+     *           nodo, "no se pueden declarar variables globales")) return;
+     */
+    public boolean exigir(boolean condicion, int linea, int columna, String queEstaMal) {
+
+        if (!condicion) {
+            reportarError(linea, columna, "En " + dialecto.nombre() + " " + queEstaMal);
+        }
+
+        return condicion;
     }
 
     public void reportarError(int linea, int columna, String mensaje) {

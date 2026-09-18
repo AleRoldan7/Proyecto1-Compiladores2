@@ -26,13 +26,37 @@ public class Cuarteta {
     public String toString() {
         return switch (operador) {
 
-            case "label" -> resultado + ":";
-            case "goto" -> "goto" + resultado;
-            case "if_false" -> "if_false" + arg1 + "goto" + resultado;
-            case "=" -> resultado + "=" + arg1;
-            case "call" -> resultado + "= call" + arg1 + ", " + arg2;
-            case "param" -> "param" + arg1;
-            default -> resultado + "=" + arg1 + " " + operador + " " + arg2;
+            /*
+             * FIX: faltaban espacios en casi todos los casos, así que el
+             * C3D salía como "gotoetq0" / "if_falsetmp1gotoetq2" y era
+             * ilegible (y no se podía volver a parsear).
+             */
+            case "label"    -> resultado + ":";
+            case "goto"     -> "goto " + resultado;
+            case "if_true"  -> "if " + arg1 + " goto " + resultado;
+            case "if_false" -> "if_false " + arg1 + " goto " + resultado;
+            case "="        -> resultado + " = " + arg1;
+            case "call"     -> resultado == null
+                    ? "call " + arg1 + ", " + arg2
+                    : resultado + " = call " + arg1 + ", " + arg2;
+            case "param"    -> "param " + arg1;
+            case "return"   -> arg1 == null ? "return" : "return " + arg1;
+            case "print"    -> "print " + arg1;
+            case "read"     -> resultado + " = read";
+            case "halt"     -> "halt";
+
+            // Unarios: resultado = op arg1   (ej: t1 = - t0, t2 = ! t1)
+            case "neg"      -> resultado + " = -" + arg1;
+            case "not"      -> resultado + " = !" + arg1;
+
+            // Arreglos: t = base[indice]  /  base[indice] = valor
+            case "index_get" -> resultado + " = " + arg1 + "[" + arg2 + "]";
+            case "index_set" -> resultado + "[" + arg1 + "] = " + arg2;
+
+            // Heap: reserva de objetos (el enunciado exige heap para objetos)
+            case "new"      -> resultado + " = new " + arg1;
+
+            default -> resultado + " = " + arg1 + " " + operador + " " + arg2;
         };
     }
 }

@@ -24,6 +24,9 @@ public class AnalizadorConstructor implements AnalizadorSemantico<Constructor> {
         if (analisisContexto.getClaseActual() != null && !nodoConstructor.getNombreClase().equals(analisisContexto.getClaseActual().getNombre())) {
             analisisContexto.reportarError(nodoConstructor.getLinea(), nodoConstructor.getColumna(),
                     "El nombre del constructor debe coincidir con el de la clase");
+
+            System.out.println("clase actual: " + analisisContexto.getClaseActual().getNombre());
+            System.out.println("constructor " + nodoConstructor.getNombreClase().toString());
         }
 
         analisisContexto.getTablaSimbolos().entrarAmbito("Constructor");

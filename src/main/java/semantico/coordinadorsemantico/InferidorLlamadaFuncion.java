@@ -27,13 +27,20 @@ public class InferidorLlamadaFuncion implements InferirTipo<LlamadaFuncion> {
             tiposArgumentos.add(inferirTipoCoordinador.inferir(argumento, analisisContexto));
         }
 
-        // Funciones propias del lenguaje: no se validan contra la tabla de tipos.
         if ("readln".equals(nodoLlamada.getNombre())) {
             return Tipos.simple(nodoLlamada.getLinea(), nodoLlamada.getColumna(), Tipos.STRING);
         }
 
         if ("print".equals(nodoLlamada.getNombre()) || "println".equals(nodoLlamada.getNombre())) {
             return Tipos.simple(nodoLlamada.getLinea(), nodoLlamada.getColumna(), Tipos.VOID);
+        }
+
+        if ("imprimir".equals(nodoLlamada.getNombre())) {
+            return Tipos.simple(nodoLlamada.getLinea(), nodoLlamada.getColumna(), Tipos.VOID);
+        }
+
+        if ("leer".equals(nodoLlamada.getNombre())) {
+            return Tipos.simple(nodoLlamada.getLinea(), nodoLlamada.getColumna(), Tipos.STRING);
         }
 
         InformeTipo claseActual = analisisContexto.getClaseActual();

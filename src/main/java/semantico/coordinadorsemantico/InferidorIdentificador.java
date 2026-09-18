@@ -34,7 +34,8 @@ public class InferidorIdentificador implements InferirTipo<Identificador> {
 
             return null;
         }
-
+        System.out.println("IDENTIFICADOR: " + nodoIdentificador.getNombreIdentificador()
+                + " -> tipoEnTabla=[" + filaTabla.getTipo() + "]");
         return Tipos.desdeTexto(nodoIdentificador.getLinea(), nodoIdentificador.getColumna(), filaTabla.getTipo());
     }
 }

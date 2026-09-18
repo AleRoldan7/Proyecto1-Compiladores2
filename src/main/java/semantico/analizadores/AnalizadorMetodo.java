@@ -46,4 +46,5 @@ public class AnalizadorMetodo implements AnalizadorSemantico<Metodo> {
 
         analisisContexto.getTablaSimbolos().salirAmbito();
     }
+
 }

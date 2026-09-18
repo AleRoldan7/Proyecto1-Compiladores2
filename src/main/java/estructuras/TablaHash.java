@@ -3,8 +3,10 @@ package estructuras;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -113,5 +115,22 @@ public class TablaHash<T> {
         return valores;
     }
 
+    public List<Map.Entry<String, T>> entradas() {
+
+        List<Map.Entry<String, T>> lista = new ArrayList<>();
+
+        for (int i = 0; i < buckets.length; i++) {
+            NodoHash<T> actual = getBucket(i);
+            while (actual != null) {
+                lista.add(new AbstractMap.SimpleEntry<>(
+                        actual.getClave(),
+                        actual.getValor()
+                ));
+                actual = actual.getSiguiente();
+            }
+        }
+
+        return lista;
+    }
 
 }

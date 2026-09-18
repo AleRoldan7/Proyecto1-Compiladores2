@@ -2,6 +2,8 @@ package semantico.coordinadorsemantico;
 
 import ast.expresiones.AccesoArreglo;
 import ast.expresiones.Expresion;
+import ast.expresiones.ExpresionUnaria;
+import ast.expresiones.Literal;
 import ast.tipos.Tipo;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -27,16 +29,46 @@ public class InferidorAccesoArreglo implements InferirTipo<AccesoArreglo> {
             Tipo tipoIndice = inferirTipoCoordinador.inferir(indice, analisisContexto);
 
             if (tipoIndice != null && !Tipos.INT.equals(tipoIndice.getNombre())) {
-
                 analisisContexto.reportarError(indice.getLinea(), indice.getColumna(), "El índice de un arreglo debe ser int, se encontró "
                         + Tipos.describir(tipoIndice));
+                continue;
+            }
+
+            if (indice instanceof Literal literal) {
+
+                Object valor = literal.getValor();
+
+                if (valor instanceof Integer && (Integer) valor < 0) {
+                    analisisContexto.reportarError(indice.getLinea(), indice.getColumna(),
+                            "El índice de un arreglo no puede ser negativo, se encontró " + valor);
+                }
+            }
+
+            if (indice instanceof ExpresionUnaria unaria) {
+
+                if ("-".equals(unaria.getOperador()) && unaria.getExpresion() instanceof Literal literal) {
+
+                    Object valor = literal.getValor();
+
+                    if (valor instanceof Integer) {
+
+                        int valorNegativo = -(Integer) valor;
+
+                        analisisContexto.reportarError(indice.getLinea(), indice.getColumna(),
+                                "El índice de un arreglo no puede ser negativo, se encontró " + valorNegativo);
+                    }
+                }
             }
         }
 
-        if (tipoArreglo == null || !tipoArreglo.isArreglo()) {
+        if (tipoArreglo == null) {
+            return null;
+        }
 
-            analisisContexto.reportarError(nodoAcceso.getLinea(), nodoAcceso.getColumna(), "'" + Tipos.describir(tipoArreglo)
-                    + "' no es un arreglo, no se puede indexar");
+        if (!tipoArreglo.isArreglo()) {
+
+            analisisContexto.reportarError(nodoAcceso.getLinea(), nodoAcceso.getColumna(),
+                    "'" + Tipos.describir(tipoArreglo) + "' no es un arreglo, no se puede indexar");
 
             return null;
         }
@@ -54,11 +86,11 @@ public class InferidorAccesoArreglo implements InferirTipo<AccesoArreglo> {
         String base = Tipos.base(tipoArreglo);
 
         StringBuilder nombre = new StringBuilder(base);
+
         for (int i = 0; i < dimensionesRestantes; i++) {
             nombre.append("[]");
         }
 
         return new Tipo(nodoAcceso.getLinea(), nodoAcceso.getColumna(), nombre.toString(), dimensionesRestantes > 0, dimensionesRestantes);
-
     }
 }

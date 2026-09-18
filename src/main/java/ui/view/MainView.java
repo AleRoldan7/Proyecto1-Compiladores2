@@ -11,6 +11,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
 import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.LineNumberFactory;
+import semantico.AnalisisContexto;
 import tablas.FilaTabla;
 import ui.button_option.ConsolaErrores;
 import ui.button_option.TablaSimbolosView;
@@ -21,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -530,9 +532,17 @@ public class MainView extends BorderPane {
             return;
         }
 
-        TablaSimbolosView tabla = new TablaSimbolosView();
-        tabla.actualizar((List<FilaTabla>) resultadoProyecto.getContexto().getTablaSimbolos().getHistorialTabla());
+        // Recolectar todas las filas de todos los contextos
+        List<FilaTabla> todas = new ArrayList<>();
 
+        for (AnalisisContexto ctx : resultadoProyecto.getContextos().values()) {
+            if (ctx.getTablaSimbolos() != null) {
+                todas.addAll(ctx.getTablaSimbolos().getHistorialTabla());
+            }
+        }
+
+        TablaSimbolosView tabla = new TablaSimbolosView();
+        tabla.actualizar(todas);
         mostrarVista(tabla);
     }
 

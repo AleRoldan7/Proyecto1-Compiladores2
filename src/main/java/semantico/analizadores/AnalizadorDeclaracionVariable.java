@@ -30,7 +30,7 @@ public class AnalizadorDeclaracionVariable implements AnalizadorSemantico<Declar
 
         } else {
 
-            analisisContexto.getTablaSimbolos().declarar(nombre, Categoria.VARIABLE, nodoVariable.getTipo().getNombre(), "", nodoVariable.getLinea());
+            analisisContexto.getTablaSimbolos().declarar(nombre, Categoria.VARIABLE, Tipos.describir(nodoVariable.getTipo()), "", nodoVariable.getLinea());
         }
 
         Expresion inicializacion = nodoVariable.getInicializacion();
@@ -39,7 +39,7 @@ public class AnalizadorDeclaracionVariable implements AnalizadorSemantico<Declar
 
             Tipo inicio = inferirTipoCoordinador.inferir(inicializacion, analisisContexto);
 
-            if (!Tipos.sonCompatibles(nodoVariable.getTipo(), inicio)) {
+            if (!Tipos.asignable(nodoVariable.getTipo(), inicio, analisisContexto)) {
 
                 analisisContexto.reportarError(nodoVariable.getLinea(), nodoVariable.getColumna(),  "No se puede inicializar '" + nombre + "' de tipo "
                         + Tipos.describir(nodoVariable.getTipo()) + " con un valor de tipo " + Tipos.describir(inicio));

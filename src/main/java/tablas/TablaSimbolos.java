@@ -52,4 +52,47 @@ public class TablaSimbolos {
     public List<FilaTabla> getTablaCompleta() {
         return historialTabla;
     }
+
+    /**
+     * Devuelve el ámbito global (raíz) desde el ámbito actual.
+     */
+    public Ambito getAmbitoRaiz() {
+        Ambito a = ambitoActual;
+        while (a.getAmbitoPadre() != null) {
+            a = a.getAmbitoPadre();
+        }
+        return a;
+    }
+
+    /**
+     * Copia los símbolos GLOBALES de otra tabla a esta. Se usa para
+     * importaciones: Pig Latin importa un .y y necesita llamar a sus
+     * funciones, o importa un .z y necesita ver sus clases.
+     *
+     * Solo se copian los símbolos del ámbito GLOBAL y de categoría
+     * FUNCION o CLASE. Los parámetros, variables locales, atributos y
+     * variables globales NO se importan.
+     */
+    public void importarDe(TablaSimbolos otra) {
+
+        if (otra == null) return;
+
+        Ambito globalOtra = otra.getAmbitoRaiz();
+        Ambito globalLocal = this.getAmbitoRaiz();
+
+        if (globalOtra == null || globalLocal == null) return;
+
+        for (FilaTabla fila : globalOtra.getSimbolosLocales()) {
+
+            if (fila.getCategoria() != Categoria.FUNCION
+                    && fila.getCategoria() != Categoria.CLASE) {
+                continue;
+            }
+
+            if (!globalLocal.existeLocalmente(fila.getNombre())) {
+                globalLocal.declarar(fila.getNombre(), fila);
+                this.historialTabla.add(fila);
+            }
+        }
+    }
 }

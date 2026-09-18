@@ -27,7 +27,7 @@ public class AnalizadorAtributo implements AnalizadorSemantico<Atributo> {
 
         } else {
 
-            contexto.getTablaSimbolos().declarar(nombre, Categoria.ATRIBUTO, nodo.getTipo().getNombre(), "", nodo.getLinea());
+            contexto.getTablaSimbolos().declarar(nombre, Categoria.ATRIBUTO, Tipos.describir(nodo.getTipo()), "", nodo.getLinea());
         }
 
         if (contexto.getClaseActual() != null) {

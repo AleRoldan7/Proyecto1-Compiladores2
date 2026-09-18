@@ -37,14 +37,15 @@ public class InferidorCrearArreglo implements InferirTipo<CrearArreglo> {
 
         if (nodoArreglo.getValoresIniciales() != null) {
 
-            Tipo tipoBase = Tipos.simple(nodoArreglo.getLinea(), nodoArreglo.getColumna(), nodoArreglo.getTipoBase());
+            String nombre = Tipos.base(Tipos.simple(nodoArreglo.getLinea(), nodoArreglo.getColumna(), nodoArreglo.getTipoBase()));
+            Tipo tipoBase = Tipos.simple(nodoArreglo.getLinea(), nodoArreglo.getColumna(), nombre);
 
             for (Expresion elemento : nodoArreglo.getValoresIniciales()) {
 
                 Tipo tipoElemento = inferirTipoCoordinador.inferir(elemento, analisisContexto);
 
                 if (!Tipos.sonCompatibles(tipoBase, tipoElemento)) {
-
+                    System.out.println("TIPO: " + Tipos.describir(tipoElemento));
                     analisisContexto.reportarError(elemento.getLinea(), elemento.getColumna(), "Elemento de tipo " + Tipos.describir(tipoElemento)
                             + " no es compatible con el arreglo de tipo " + nodoArreglo.getTipoBase());
                 }

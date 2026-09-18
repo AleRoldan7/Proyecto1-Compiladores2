@@ -424,109 +424,48 @@ listaArgumentos:
    ESPACIOS
    ========================================================= */
 
-WS:
-    [ \t\n\r]+ -> skip
-    ;
+WS: [ \t\n\r]+ -> skip;
 
 /* =========================================================
    COMENTARIOS
    ========================================================= */
-
-COMENTARIO_LINEA:
-    '//' ~[\r\n]* -> skip
-    ;
-
-COMENTARIO_BLOQUE:
-    '/*' .*? '*/' -> skip
-    ;
+COMENTARIO_LINEA:'//' ~[\r\n]* -> skip;
+COMENTARIO_BLOQUE:'/*' .*? '*/' -> skip;
 
 /* =========================================================
    INCREMENTO Y DECREMENTO
    ========================================================= */
-
-INCREMENTO:
-    '++'
-    ;
-
-DECREMENTO:
-    '--'
-    ;
+INCREMENTO:'++';
+DECREMENTO:'--';
 
 /* =========================================================
    OPERADORES ARITMETICOS
    ========================================================= */
-
-MAS:
-    '+'
-    ;
-
-RESTA:
-    '-'
-    ;
-
-MULTIPLICACION:
-    '*'
-    ;
-
-DIVISION:
-    '/'
-    ;
-
-MODULO:
-    '%'
-    ;
+MAS:'+';
+RESTA:'-';
+MULTIPLICACION:'*';
+DIVISION:'/';
+MODULO:'%';
 
 /* =========================================================
    SIGNOS ESPECIALES
    ========================================================= */
 
-MENORLEER:
-    '<<'
-    ;
-
-MAYORIMPRIMIR:
-    '>>'
-    ;
-
-COMILLAS:
-    '"' (ESC | ~["\\])* '"'
-    ;
-
-fragment ESC:
-    '\\' .
-    ;
-
-COMILLASSIMPLES:
-    '\'' ~['\r\n] '\''
-    ;
+MENORLEER:'<<';
+MAYORIMPRIMIR:'>>';
+COMILLAS:'"' (ESC | ~["\\])* '"';
+fragment ESC:'\\' .;
+COMILLASSIMPLES:'\'' ~['\r\n] '\'';
 
 /* =========================================================
    OPERADORES RELACIONALES
    ========================================================= */
-
-MAYORIGUAL:
-    '>='
-    ;
-
-MENORIGUAL:
-    '<='
-    ;
-
-COMPARACION:
-    '=='
-    ;
-
-DIFERENCIA:
-    '!='
-    ;
-
-MENOR:
-    '<'
-    ;
-
-MAYOR:
-    '>'
-    ;
+MAYORIGUAL:'>=';
+MENORIGUAL:'<=';
+COMPARACION:'==';
+DIFERENCIA:'!=';
+MENOR:'<';
+MAYOR:'>';
 
 /* =========================================================
    OPERADORES LOGICOS

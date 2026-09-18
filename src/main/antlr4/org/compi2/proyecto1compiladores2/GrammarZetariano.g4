@@ -116,13 +116,16 @@ condicional:
 
 switchCase:
     SWITCH PARENTESIS_ABRE expresion PARENTESIS_CIERRA LLAVE_ABRE
-        casoSwitch+
-        (DEFAULT DOS_PUNTOS bloqueCaso)?
+        (casoSwitch | casoDefault)*
     LLAVE_CIERRA
     ;
 
 casoSwitch:
-    CASE literal DOS_PUNTOS bloqueCaso
+    CASE literal DOS_PUNTOS sentencia*
+    ;
+
+casoDefault:
+    DEFAULT DOS_PUNTOS sentencia*
     ;
 
 /* El break ya no es obligatorio (se permite fall-through, como en Java/C): como BREAK ya es
@@ -162,27 +165,57 @@ readlnExpr:
 /* --------- Expresiones (con precedencia) --------- */
 
 expresion:
-      PARENTESIS_ABRE expresion PARENTESIS_CIERRA                     # expParentesis
-    | NEGACION expresion                                               # expNegacionLogica
-    | RESTA expresion                                                  # expNegativo
-    | (INCREMENTO | DECREMENTO) accesoVariable                         # expPreIncrDecr
-    | accesoVariable (INCREMENTO | DECREMENTO)                         # expPostIncrDecr
-    | NEW ID PARENTESIS_ABRE listaArgumentos? PARENTESIS_CIERRA         # expCrearObjeto
-    /* FIX: nueva alternativa para crear arreglos, p.ej. new int[5], new int[3][3] */
-    | NEW tipoBase (CORCHETE_ABRE expresion CORCHETE_CIERRA)+           # expCrearArreglo
-    | expresion op=(MULTIPLICACION | DIVISION | MODULO) expresion      # expMultiplicativa
-    | expresion op=(MAS | RESTA) expresion                             # expAditiva
-    | expresion op=(MENOR | MAYOR | MENORIGUAL | MAYORIGUAL) expresion # expRelacional
-    | expresion op=(COMPARACION | DIFERENCIA) expresion                # expIgualdad
-    | expresion op=AND expresion                                       # expAnd
-    | expresion op=OR expresion                                        # expOr
-    | expresion TERNARIO expresion DOS_PUNTOS expresion                # expTernaria
-    | readlnExpr                                                       # expReadln
-    | llamadaMetodo                                                    # expLlamadaMetodo
-    | llamadaFuncion                                                   # expLlamadaFuncion
-    | accesoVariable                                                   # expAcceso
-    | literal                                                          # expLiteral
-    | THIS                                                             # expThis
+    expresionTernaria
+    ;
+
+expresionTernaria:
+      expresionOr TERNARIO expresion DOS_PUNTOS expresion     # expTernaria
+    | expresionOr                                            # expSinTernaria
+    ;
+
+expresionOr:
+    expresionAnd (OR expresionAnd)*
+    ;
+
+expresionAnd:
+    expresionIgualdad (AND expresionIgualdad)*
+    ;
+
+expresionIgualdad:
+    expresionRelacional ((COMPARACION | DIFERENCIA) expresionRelacional)*
+    ;
+
+expresionRelacional:
+    expresionAditiva ((MENOR | MAYOR | MENORIGUAL | MAYORIGUAL) expresionAditiva)*
+    ;
+
+expresionAditiva:
+    expresionMultiplicativa ((MAS | RESTA) expresionMultiplicativa)*
+    ;
+
+expresionMultiplicativa:
+    expresionUnaria ((MULTIPLICACION | DIVISION | MODULO) expresionUnaria)*
+    ;
+
+expresionUnaria:
+      (NEGACION | RESTA | INCREMENTO | DECREMENTO) expresionUnaria   # expUnaria
+    | expresionPostfija                                              # expSinUnaria
+    ;
+
+expresionPostfija:
+    expresionPrimaria ((INCREMENTO | DECREMENTO))?                   # expPostfija
+    ;
+
+expresionPrimaria:
+      PARENTESIS_ABRE expresion PARENTESIS_CIERRA                    # expParentesis
+    | NEW tipoBase (CORCHETE_ABRE expresion CORCHETE_CIERRA)+       # expCrearArreglo
+    | NEW ID PARENTESIS_ABRE listaArgumentos? PARENTESIS_CIERRA      # expCrearObjeto
+    | readlnExpr                                                     # expReadln
+    | llamadaMetodo                                                  # expLlamadaMetodo
+    | llamadaFuncion                                                 # expLlamadaFuncion
+    | accesoVariable                                                 # expAcceso
+    | literal                                                        # expLiteral
+    | THIS                                                           # expThis
     ;
 
 llamadaFuncion:

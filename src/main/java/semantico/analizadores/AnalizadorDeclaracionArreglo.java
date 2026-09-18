@@ -30,7 +30,7 @@ public class AnalizadorDeclaracionArreglo implements AnalizadorSemantico<Declara
 
         } else {
 
-            analisisContexto.getTablaSimbolos().declarar(nombre, Categoria.VARIABLE, nodoArreglo.getTipo().getNombre(), "", nodoArreglo.getLinea());
+            analisisContexto.getTablaSimbolos().declarar(nombre, Categoria.VARIABLE, Tipos.describir(nodoArreglo.getTipo()), "", nodoArreglo.getLinea());
         }
 
         if (nodoArreglo.getValorInicial() != null) {
@@ -41,7 +41,7 @@ public class AnalizadorDeclaracionArreglo implements AnalizadorSemantico<Declara
 
                 Tipo tipoElemento = inferirTipoCoordinador.inferir(elemento, analisisContexto);
 
-                if (!Tipos.sonCompatibles(tipoBase, tipoElemento)) {
+                if (!Tipos.asignable(tipoBase, tipoElemento, analisisContexto)) {
 
                     analisisContexto.reportarError(elemento.getLinea(), elemento.getColumna(), "Elemento de tipo " +
                             Tipos.describir(tipoElemento) + " no es compatible  con el arreglo de tipo " + Tipos.describir(nodoArreglo.getTipo()));
