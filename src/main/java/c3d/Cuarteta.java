@@ -55,6 +55,22 @@ public class Cuarteta {
 
             // Heap: reserva de objetos (el enunciado exige heap para objetos)
             case "new"      -> resultado + " = new " + arg1;
+            // Dentro del switch de Cuarteta.toString():
+
+            case "param_decl"  -> "param " + arg1 + " " + arg2;
+            case "new_array"   -> resultado + " = new " + arg1 + "[" + arg2 + "]";
+            case "field_set"   -> resultado + "." + arg1 + " = " + arg2;
+            case "attr_get"    -> resultado + " = " + arg1 + "." + arg2;
+
+            // Relacionales
+            case "if_<"   -> "if " + arg1 + " < " + arg2 + " goto " + resultado;
+            case "if_>"   -> "if " + arg1 + " > " + arg2 + " goto " + resultado;
+            case "if_<="  -> "if " + arg1 + " <= " + arg2 + " goto " + resultado;
+            case "if_>="  -> "if " + arg1 + " >= " + arg2 + " goto " + resultado;
+            case "if_=="  -> "if " + arg1 + " == " + arg2 + " goto " + resultado;
+            case "if_!="  -> "if " + arg1 + " != " + arg2 + " goto " + resultado;
+
+            case "comment" -> "// " + resultado;
 
             default -> resultado + " = " + arg1 + " " + operador + " " + arg2;
         };

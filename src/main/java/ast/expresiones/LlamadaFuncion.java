@@ -19,8 +19,24 @@ public class LlamadaFuncion extends Expresion {
         this.argumentos = argumentos;
     }
 
-    @Override
-    public void generarC3D(ContextoC3D contexto) {
 
+    @Override
+    public String generarC3D(ContextoC3D contexto) {
+
+        // 1. Evaluar cada argumento y emitir 'param' en orden
+        if (argumentos != null) {
+            for (Expresion arg : argumentos) {
+                String valor = arg.generarC3D(contexto);
+                contexto.agregar("param", valor, null, null);
+            }
+        }
+
+        // 2. Llamar a la función y guardar el resultado en un temporal
+        String temporal = contexto.nuevoTemporal();
+        int cantidadArgs = (argumentos == null) ? 0 : argumentos.size();
+
+        contexto.agregar("call", nombre, String.valueOf(cantidadArgs), temporal);
+
+        return temporal;
     }
 }

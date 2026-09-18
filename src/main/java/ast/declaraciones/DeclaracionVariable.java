@@ -25,23 +25,14 @@ public class DeclaracionVariable extends Declaracion {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
-
-        if (inicializacion == null) {
-            return;
+    public String generarC3D(ContextoC3D contexto) {
+        // Solo la inicialización genera código.
+        // La declaración en sí ya la maneja el generador de C.
+        if (inicializacion != null) {
+            String valor = inicializacion.generarC3D(contexto);
+            contexto.asignar(nombre, valor);
         }
-        inicializacion.generarC3D(contexto);
-        contexto.agregarConTipo("=", inicializacion.getResultado(), null, nombre, mapeoRapido(tipo.getNombre()));
-    }
 
-    private TipoDato mapeoRapido(String nombreTipo) {
-        return switch (nombreTipo) {
-            case "entero" -> TipoDato.ENTERO;
-            case "flotante" -> TipoDato.DECIMAL;
-            case "cadena" -> TipoDato.TEXTO;
-            case "caracter" -> TipoDato.CARACTER;
-            case "bool" -> TipoDato.BOOLEANO;
-            default -> TipoDato.DESCONOCIDO;
-        };
+        return nombre;   // por si alguien usa la variable como expresión
     }
 }

@@ -18,7 +18,8 @@ public class SentenciaExpresion extends NodoAST implements Sentencia {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
+    public String generarC3D(ContextoC3D contexto) {
         expresion.generarC3D(contexto);
+        return null;
     }
 }

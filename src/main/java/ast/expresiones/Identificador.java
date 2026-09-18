@@ -16,7 +16,7 @@ public class Identificador extends Expresion {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
-        this.resultado = nombreIdentificador;
+    public String generarC3D(ContextoC3D contexto) {
+        return nombreIdentificador;
     }
 }

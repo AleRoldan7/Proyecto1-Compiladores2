@@ -25,7 +25,33 @@ public class Constructor extends NodoAST {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
+    public String generarC3D(ContextoC3D contexto) {
 
+        String nombreFuncion = "init_" + nombreClase;
+
+        contexto.registrarFuncion(nombreFuncion);
+        contexto.agregarEtiqueta("func_" + nombreFuncion);
+
+        // Declarar parámetros (self incluido como parámetro 0)
+        contexto.agregar("param_decl", nombreClase, "self", null);
+
+        if (parametros != null) {
+            for (Parametro p : parametros) {
+                contexto.agregar("param_decl",
+                        p.getTipoParametro().getNombre(),
+                        p.getNombreParametro(),
+                        null);
+            }
+        }
+
+        // Cuerpo
+        cuerpoConstructor.generarC3D(contexto);
+
+        // Retorno implícito
+        contexto.agregar("return", null, null, null);
+
+        contexto.agregarEtiqueta("end_" + nombreFuncion);
+
+        return null;
     }
 }

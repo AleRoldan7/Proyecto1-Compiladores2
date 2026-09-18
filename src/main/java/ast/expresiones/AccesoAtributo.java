@@ -18,7 +18,14 @@ public class AccesoAtributo extends Expresion {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
+    public String generarC3D(ContextoC3D contexto) {
 
+        String obj = objeto.generarC3D(contexto);
+
+        // Puntero al atributo: obj->atributo
+        String temporal = contexto.nuevoTemporal();
+        contexto.agregar("attr_get", obj, atributo, temporal);
+
+        return temporal;
     }
 }

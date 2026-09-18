@@ -22,7 +22,8 @@ public class SentenciaLlamadaFuncion extends NodoAST implements  Sentencia {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
+    public String generarC3D(ContextoC3D contexto) {
         llamada.generarC3D(contexto);
+        return null;
     }
 }

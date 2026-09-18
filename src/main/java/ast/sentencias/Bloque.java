@@ -19,7 +19,10 @@ public class Bloque extends NodoAST implements Sentencia {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
-
+    public String generarC3D(ContextoC3D contexto) {
+        for (Sentencia s : sentencias) {
+            s.generarC3D(contexto);
+        }
+        return null;
     }
 }

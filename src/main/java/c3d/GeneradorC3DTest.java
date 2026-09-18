@@ -1,10 +1,14 @@
 package c3d;
 
+import analisis.CompiladorArchivo;
+import ast.NodoAST;
 import ast.Programa;
+import enums.TipoArchivo;
 import org.antlr.v4.runtime.*;
 import org.compi2.proyecto1compiladores2.GrammarPythonLexer;
 import org.compi2.proyecto1compiladores2.GrammarPythonParser;
 import org.testng.annotations.Test;
+import semantico.AnalisisContexto;
 import utils.generadorC.GeneradorCodigoC;
 import visitor.piton.LexerIndentacionY;
 import visitor.piton.VisitorPiton;
@@ -136,4 +140,118 @@ public class GeneradorC3DTest {
 
     }
     */
-}
+
+
+        public static void main(String[] args) throws Exception {
+
+            // ============================================================
+            // 1. Código Zetariano de prueba
+            // ============================================================
+
+            String codigo = """
+                    public class Prueba {
+                        int a;
+                        int b;
+                    
+                        public int sumar(int x, int y) {
+                            return x + y;
+                        }
+                    
+                        public void main() {
+                            a = 5;
+                            b = 3;
+                            int c = a + b * 2;
+                            if (a > b) {
+                                c = c + 1;
+                            } else {
+                                c = c - 1;
+                            }
+                            while (c < 100) {
+                                c = c + 1;
+                            }
+                        }
+                    }
+                    """;
+
+            // ============================================================
+            // 2. Compilar: léxico + sintáctico + semántico
+            // ============================================================
+
+            CompiladorArchivo compilador = new CompiladorArchivo();
+
+            AnalisisContexto contexto = AnalisisContexto.paraArchivo(
+                    "Prueba.z", TipoArchivo.ZETARIANO);
+
+            NodoAST ast = compilador.analizar(codigo, TipoArchivo.ZETARIANO, contexto);
+
+            // ============================================================
+            // 3. Reportar errores (si los hay)
+            // ============================================================
+
+            System.out.println("=== ERRORES ===");
+
+            if (contexto.getErrores().isEmpty()) {
+                System.out.println("(ninguno)");
+            } else {
+                contexto.getErrores().forEach(e -> System.out.println(e));
+            }
+
+            // ============================================================
+            // 4. Si no hay errores, generar C3D
+            // ============================================================
+
+            if (ast == null) {
+                System.out.println("\n(No se pudo construir el AST)");
+                return;
+            }
+
+            if (contexto.tieneErrores()) {
+                System.out.println("\n(Hay errores semánticos; se omite la generación de C3D)");
+                return;
+            }
+
+            ContextoC3D c3d = new ContextoC3D();
+
+            try {
+                ast.generarC3D(c3d);
+            } catch (Exception e) {
+                System.out.println("\n=== ERROR AL GENERAR C3D ===");
+                e.printStackTrace();
+                return;
+            }
+
+            // ============================================================
+            // 5. Imprimir el C3D resultante
+            // ============================================================
+
+            System.out.println("\n=== CÓDIGO DE TRES DIRECCIONES ===");
+            System.out.println(c3d.comoTexto());
+
+            // ============================================================
+            // 6. Tabla de strings (para el paso a C)
+            // ============================================================
+
+            if (!c3d.getTablaStrings().isEmpty()) {
+                System.out.println("\n=== TABLA DE STRINGS ===");
+                c3d.getTablaStrings().forEach((nombre, valor) ->
+                        System.out.println("    " + nombre + " = \"" + valor + "\""));
+            }
+
+            // ============================================================
+            // 7. Funciones registradas (para forward decls en C)
+            // ============================================================
+
+            if (!c3d.getFuncionesGeneradas().isEmpty()) {
+                System.out.println("\n=== FUNCIONES GENERADAS ===");
+                c3d.getFuncionesGeneradas().forEach(f -> System.out.println("    " + f));
+            }
+
+            // ============================================================
+            // 8. Volcar el C3D a un archivo
+            // ============================================================
+
+            String c = GenerarCodigoC.traducir(c3d.getCuartetas());
+            Files.writeString(Path.of("salida.c"), c);
+            System.out.println("\n(C escrito en salida.c)");
+        }
+    }

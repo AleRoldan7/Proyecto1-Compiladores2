@@ -24,8 +24,12 @@ public class Clase extends NodoAST {
         this.metodos = metodos;
     }
 
-    @Override
-    public void generarC3D(ContextoC3D contexto) {
 
+    @Override
+    public String generarC3D(ContextoC3D contexto) {
+        for (Metodo m : metodos) m.generarC3D(contexto);
+        for (Constructor c : constructores) c.generarC3D(contexto);
+        // NO emitir comment ni halt aquí
+        return null;
     }
 }

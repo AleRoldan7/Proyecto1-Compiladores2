@@ -19,8 +19,10 @@ public class SentenciaCase extends NodoAST implements Sentencia {
         this.cuerpoCase = cuerpoCase;
     }
 
-    @Override
-    public void generarC3D(ContextoC3D contexto) {
 
+    @Override
+    public String generarC3D(ContextoC3D contexto) {
+        // El switch maneja todo. No se llama directamente.
+        return null;
     }
 }

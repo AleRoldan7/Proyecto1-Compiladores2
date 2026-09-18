@@ -1,6 +1,7 @@
 package ast.expresiones;
 
 import c3d.ContextoC3D;
+import enums.TipoDato;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -20,7 +21,32 @@ public class ExpresionUnaria extends Expresion {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
+    public String generarC3D(ContextoC3D contexto) {
 
+        String operando = expresion.generarC3D(contexto);
+
+        switch (operador) {
+
+            case "-":
+                return contexto.unaria("neg", operando, TipoDato.ENTERO);
+
+            case "!":
+                return contexto.unaria("not", operando, TipoDato.BOOLEANO);
+
+            case "++": {
+                String res = contexto.binaria("+", operando, "1", TipoDato.ENTERO);
+                contexto.asignar(operando, res);
+                return operando;
+            }
+
+            case "--": {
+                String res = contexto.binaria("-", operando, "1", TipoDato.ENTERO);
+                contexto.asignar(operando, res);
+                return operando;
+            }
+
+            default:
+                return operando;
+        }
     }
 }

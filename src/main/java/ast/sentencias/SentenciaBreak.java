@@ -8,8 +8,13 @@ public class SentenciaBreak extends NodoAST implements Sentencia {
     public SentenciaBreak(int linea, int columna) {
         super(linea, columna);
     }
-    @Override
-    public void generarC3D(ContextoC3D contexto) {
 
+    @Override
+    public String generarC3D(ContextoC3D contexto) {
+        String etq = contexto.etiquetaBreak();
+        if (etq != null) {
+            contexto.salto(etq);
+        }
+        return null;
     }
 }

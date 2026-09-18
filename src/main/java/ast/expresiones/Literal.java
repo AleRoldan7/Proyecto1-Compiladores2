@@ -18,7 +18,20 @@ public class Literal extends Expresion {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
-        this.resultado = String.valueOf(valor);
+    public String generarC3D(ContextoC3D contexto) {
+        if (valor == null) {
+            return "0";   // null → 0
+        }
+
+        if (valor instanceof String s) {
+            // Registrar el string y devolver su nombre lógico
+            return contexto.registrarString(s);
+        }
+
+        if (valor instanceof Boolean b) {
+            return b ? "1" : "0";
+        }
+
+        return String.valueOf(valor);
     }
 }

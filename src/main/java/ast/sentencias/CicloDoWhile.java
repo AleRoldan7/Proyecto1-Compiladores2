@@ -20,7 +20,25 @@ public class CicloDoWhile extends NodoAST implements Sentencia {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
+    public String generarC3D(ContextoC3D contexto) {
 
+        String etqInicio = contexto.nuevaEtiqueta();
+        String etqCuerpo = contexto.nuevaEtiqueta();
+        String etqFin = contexto.nuevaEtiqueta();
+
+        // continue → etqCuerpo (donde se evalúa la condición), break → etqFin
+        contexto.entrarCiclo(etqCuerpo, etqFin);
+
+        contexto.agregarEtiqueta(etqInicio);
+        bloqueDoWhile.generarC3D(contexto);
+
+        // Evaluar la condición: si verdadera, repetir; si falsa, salir
+        contexto.agregarEtiqueta(etqCuerpo);
+        CondicionIf.generarCondicion(expresionDoWhile, contexto, etqInicio, etqFin);
+
+        contexto.agregarEtiqueta(etqFin);
+
+        contexto.salirCiclo();
+        return null;
     }
 }

@@ -30,7 +30,9 @@ public class Atributo extends NodoAST {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
-
+    public String generarC3D(ContextoC3D contexto) {
+        // Un atributo no emite cuartetas por sí solo. La reserva de memoria
+        // del objeto se hace en 'new', y la inicialización en el constructor.
+        return null;
     }
 }

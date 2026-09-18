@@ -20,7 +20,9 @@ public class Campo extends NodoAST {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
-
+    public String generarC3D(ContextoC3D contexto) {
+        // Un campo no emite cuartetas. La estructura ya quedó descrita
+        // en la TablaTipos durante el análisis semántico.
+        return null;
     }
 }

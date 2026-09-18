@@ -22,12 +22,40 @@ public class ExpresionBinaria extends Expresion {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
-        izquierda.generarC3D(contexto);
-        derecha.generarC3D(contexto);
+    public String generarC3D(ContextoC3D contexto) {
 
-        String temporal = contexto.nuevoTemporal();
-        contexto.agregarConTipo(operacion, izquierda.getResultado(), derecha.getResultado(), temporal, TipoDato.ENTERO); // parche temporal
-        this.resultado = temporal;
+        String izq = izquierda.generarC3D(contexto);
+        String der = derecha.generarC3D(contexto);
+
+        TipoDato tipo = inferirTipo(izq, der);
+
+        // Relacionales y lógicos devuelven booleano (0/1)
+        if (esRelacional(operacion) || esLogico(operacion)) {
+            tipo = TipoDato.BOOLEANO;
+        }
+
+        return contexto.binaria(operacion, izq, der, tipo);
+    }
+
+    private TipoDato inferirTipo(String izq, String der) {
+        // Si algún operando es decimal, el resultado es decimal
+        if (esDecimal(izq) || esDecimal(der)) {
+            return TipoDato.DECIMAL;
+        }
+        return TipoDato.ENTERO;
+    }
+
+    private boolean esDecimal(String s) {
+        return s != null && s.contains(".");
+    }
+
+    private boolean esRelacional(String op) {
+        return op.equals("<") || op.equals(">") ||
+                op.equals("<=") || op.equals(">=") ||
+                op.equals("==") || op.equals("!=");
+    }
+
+    private boolean esLogico(String op) {
+        return op.equals("&&") || op.equals("||");
     }
 }

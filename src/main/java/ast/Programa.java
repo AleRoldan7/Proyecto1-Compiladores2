@@ -40,22 +40,37 @@ public class Programa extends NodoAST {
                 '}';
     }
 
-    // Programa.java
     @Override
-    public void generarC3D(ContextoC3D contexto) {
-        // estructuras y clases: no generan cuartetas, solo describen tipos
-        // (su información ya quedó en TablaTipos durante el análisis semántico)
+    public String generarC3D(ContextoC3D contexto) {
 
-        if (declaraciones != null) {
-            for (Declaracion d : declaraciones) {
-                d.generarC3D(contexto); // variables globales (Pig Latin: sección VARIABILES>)
+        // 1. Estructuras: no generan cuartetas.
+        //    Su descripción ya quedó en TablaTipos.
+
+        // 2. Clases de Zetariano (u otras): cada una genera sus métodos y
+        //    constructores.
+        if (clases != null) {
+            for (Clase c : clases) {
+                c.generarC3D(contexto);
             }
         }
 
+        // 3. Funciones globales (Y? / Pig Latin)
         if (funciones != null) {
             for (DeclaracionFuncion f : funciones) {
                 f.generarC3D(contexto);
             }
         }
+
+        // 4. Variables globales (Pig Latin: VARIABILES>)
+        if (declaraciones != null) {
+            for (Declaracion d : declaraciones) {
+                d.generarC3D(contexto);
+            }
+        }
+
+        // 5. Halt final: detiene el programa
+        contexto.agregar("halt", null, null, null);
+
+        return null;
     }
 }

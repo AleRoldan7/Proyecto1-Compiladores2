@@ -1,5 +1,6 @@
 package ast.expresiones;
 
+import ast.sentencias.CondicionIf;
 import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
@@ -18,9 +19,32 @@ public class ExpresionTernaria extends Expresion {
         this.verdaderoTernaria = verdaderoTernaria;
         this.falsoTernaria = falsoTernaria;
     }
-
     @Override
-    public void generarC3D(ContextoC3D contexto) {
+    public String generarC3D(ContextoC3D contexto) {
 
+        String etqV = contexto.nuevaEtiqueta();
+        String etqF = contexto.nuevaEtiqueta();
+        String etqFin = contexto.nuevaEtiqueta();
+
+        String temp = contexto.nuevoTemporal();
+
+        // Evaluar la condición
+        CondicionIf.generarCondicion(condicionTernaria, contexto, etqV, etqF);
+
+        // Rama verdadera
+        contexto.agregarEtiqueta(etqV);
+        String v = verdaderoTernaria.generarC3D(contexto);
+        contexto.asignar(temp, v);
+        contexto.salto(etqFin);
+
+        // Rama falsa
+        contexto.agregarEtiqueta(etqF);
+        String f = falsoTernaria.generarC3D(contexto);
+        contexto.asignar(temp, f);
+        contexto.salto(etqFin);
+
+        contexto.agregarEtiqueta(etqFin);
+
+        return temp;
     }
 }

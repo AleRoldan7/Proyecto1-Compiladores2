@@ -20,7 +20,26 @@ public class CicloWhile extends NodoAST implements Sentencia {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
+    public String generarC3D(ContextoC3D contexto) {
 
+        String etqInicio = contexto.nuevaEtiqueta();
+        String etqCuerpo = contexto.nuevaEtiqueta();
+        String etqFin = contexto.nuevaEtiqueta();
+
+        // continue → etqInicio, break → etqFin
+        contexto.entrarCiclo(etqInicio, etqFin);
+
+        contexto.agregarEtiqueta(etqInicio);
+
+        CondicionIf.generarCondicion(condicionWhile, contexto, etqCuerpo, etqFin);
+
+        contexto.agregarEtiqueta(etqCuerpo);
+        bloqueWhile.generarC3D(contexto);
+        contexto.salto(etqInicio);
+
+        contexto.agregarEtiqueta(etqFin);
+
+        contexto.salirCiclo();
+        return null;
     }
 }

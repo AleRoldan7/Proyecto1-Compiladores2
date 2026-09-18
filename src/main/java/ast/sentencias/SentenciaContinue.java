@@ -10,7 +10,11 @@ public class SentenciaContinue extends NodoAST implements Sentencia {
     }
 
     @Override
-    public void generarC3D(ContextoC3D contexto) {
-
+    public String generarC3D(ContextoC3D contexto) {
+        String etq = contexto.etiquetaContinue();
+        if (etq != null) {
+            contexto.salto(etq);
+        }
+        return null;
     }
 }
