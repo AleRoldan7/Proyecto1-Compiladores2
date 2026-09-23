@@ -37,14 +37,14 @@ public class AnalizadorCondicional implements AnalizadorSemantico<CondicionIf> {
         }
     }
 
-    private void validarCondicionBooleana(Expresion condicion, AnalisisContexto contexto, String etiqueta) {
+    private void validarCondicionBooleana(Expresion condicion, AnalisisContexto analisisContexto, String etiqueta) {
 
-        Tipo tipoCondicion = inferirTipoCoordinador.inferir(condicion, contexto);
+        Tipo tipoCondicion = inferirTipoCoordinador.inferir(condicion, analisisContexto);
 
-        if (!Tipos.esBooleano(tipoCondicion)) {
+        if (!Tipos.esBooleano(tipoCondicion, analisisContexto)) {
 
-            contexto.reportarError(condicion.getLinea(), condicion.getColumna(), "La condición del " + etiqueta + " debe ser boolean, se encontró "
-                    + Tipos.describir(tipoCondicion));
+            analisisContexto.reportarError(condicion.getLinea(), condicion.getColumna(), "La condición del " + etiqueta + " debe ser boolean, se encontró "
+                    + Tipos.describir(tipoCondicion, analisisContexto));
         }
     }
 }

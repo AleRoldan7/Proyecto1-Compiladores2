@@ -137,7 +137,7 @@ public class Tipos {
         }
 
         return new Tipo(linea, columna, base, dimensiones > 0, dimensiones);
-        //                          ^^^^ sin corchetes
+
     }
 
 

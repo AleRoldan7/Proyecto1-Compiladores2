@@ -24,10 +24,10 @@ public class AnalizadorWhile implements AnalizadorSemantico<CicloWhile> {
 
         Tipo tipoCondicion = inferirTipoCoordinador.inferir(nodoWhile.getCondicionWhile(), analisisContexto);
 
-        if (!Tipos.esBooleano(tipoCondicion)) {
+        if (!Tipos.esBooleano(tipoCondicion, analisisContexto)) {
 
             analisisContexto.reportarError(nodoWhile.getCondicionWhile().getLinea(), nodoWhile.getCondicionWhile().getColumna(),
-                    "La condición del while debe ser boolean, se encontró " + Tipos.describir(tipoCondicion));
+                    "La condición del while debe ser boolean, se encontró " + Tipos.describir(tipoCondicion, analisisContexto));
         }
 
         analisisContexto.entrarCiclo();

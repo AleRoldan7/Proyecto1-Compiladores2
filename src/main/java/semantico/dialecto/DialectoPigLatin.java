@@ -20,8 +20,7 @@ public class DialectoPigLatin extends DialectoBase {
             "decimalis", TipoDato.DECIMAL,
             "textum",    TipoDato.TEXTO,
             "littera",   TipoDato.CARACTER,
-            "bool",      TipoDato.BOOLEANO,
-            "nihil",     TipoDato.VOID
+            "bool",      TipoDato.BOOLEANO
     );
 
     private static final Map<TipoDato, String> NOMBRES = Map.of(
@@ -29,8 +28,7 @@ public class DialectoPigLatin extends DialectoBase {
             TipoDato.DECIMAL,  "decimalis",
             TipoDato.TEXTO,    "textum",
             TipoDato.CARACTER, "littera",
-            TipoDato.BOOLEANO, "bool",
-            TipoDato.VOID,     "nihil"
+            TipoDato.BOOLEANO, "bool"
     );
 
     @Override protected Map<String, TipoDato> diccionarioDeTipos() { return TIPOS; }

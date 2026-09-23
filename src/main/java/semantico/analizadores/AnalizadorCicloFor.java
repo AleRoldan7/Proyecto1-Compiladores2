@@ -33,10 +33,10 @@ public class AnalizadorCicloFor implements AnalizadorSemantico<CicloFor> {
 
             Tipo tipoCondicion = inferirTipoCoordinador.inferir(nodoFor.getCondicionFor(), analisisContexto);
 
-            if (!Tipos.esBooleano(tipoCondicion)) {
+            if (!Tipos.esBooleano(tipoCondicion, analisisContexto)) {
 
                 analisisContexto.reportarError(nodoFor.getCondicionFor().getLinea(), nodoFor.getCondicionFor().getColumna(),
-                        "La condición del for debe ser boolean, se encontró " + Tipos.describir(tipoCondicion));
+                        "La condición del for debe ser boolean, se encontró " + Tipos.describir(tipoCondicion, analisisContexto));
             }
         }
 

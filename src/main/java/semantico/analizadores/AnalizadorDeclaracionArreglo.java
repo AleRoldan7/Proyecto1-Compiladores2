@@ -4,6 +4,7 @@ import ast.declaraciones.DeclaracionArreglo;
 import ast.expresiones.Expresion;
 import ast.tipos.Tipo;
 import enums.Categoria;
+import enums.TipoDato;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -30,7 +31,8 @@ public class AnalizadorDeclaracionArreglo implements AnalizadorSemantico<Declara
 
         } else {
 
-            analisisContexto.getTablaSimbolos().declarar(nombre, Categoria.VARIABLE, Tipos.describir(nodoArreglo.getTipo()), "", nodoArreglo.getLinea());
+            analisisContexto.getTablaSimbolos().declarar(nombre, Categoria.VARIABLE, Tipos.describir(nodoArreglo.getTipo(), analisisContexto),
+                    "", nodoArreglo.getLinea());
         }
 
         if (nodoArreglo.getValorInicial() != null) {
@@ -44,7 +46,8 @@ public class AnalizadorDeclaracionArreglo implements AnalizadorSemantico<Declara
                 if (!Tipos.asignable(tipoBase, tipoElemento, analisisContexto)) {
 
                     analisisContexto.reportarError(elemento.getLinea(), elemento.getColumna(), "Elemento de tipo " +
-                            Tipos.describir(tipoElemento) + " no es compatible  con el arreglo de tipo " + Tipos.describir(nodoArreglo.getTipo()));
+                            Tipos.describir(tipoElemento, analisisContexto) + " no es compatible  con el arreglo de tipo "
+                            + Tipos.describir(nodoArreglo.getTipo(), analisisContexto));
                 }
             }
         }
@@ -59,10 +62,16 @@ public class AnalizadorDeclaracionArreglo implements AnalizadorSemantico<Declara
 
                 Tipo tipoDimension = inferirTipoCoordinador.inferir(dimension, analisisContexto);
 
-                if (tipoDimension != null && !Tipos.INT.equals(tipoDimension.getNombre())) {
+                if (tipoDimension == null) {
+                    continue;
+                }
+
+                TipoDato tipoDato = Tipos.canonico(tipoDimension, analisisContexto);
+
+                if (tipoDato != TipoDato.ENTERO ) {
 
                     analisisContexto.reportarError(dimension.getLinea(), dimension.getColumna(), "La dimensión del arreglo " +
-                            "debe de ser un entero(int), se enontró " + Tipos.describir(tipoDimension));
+                            "debe de ser un entero, se enontró " + Tipos.describir(tipoDimension, analisisContexto));
                 }
             }
 

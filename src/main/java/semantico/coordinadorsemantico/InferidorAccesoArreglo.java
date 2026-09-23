@@ -5,6 +5,7 @@ import ast.expresiones.Expresion;
 import ast.expresiones.ExpresionUnaria;
 import ast.expresiones.Literal;
 import ast.tipos.Tipo;
+import enums.TipoDato;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -28,11 +29,13 @@ public class InferidorAccesoArreglo implements InferirTipo<AccesoArreglo> {
 
             Tipo tipoIndice = inferirTipoCoordinador.inferir(indice, analisisContexto);
 
-            if (tipoIndice != null && !Tipos.INT.equals(tipoIndice.getNombre())) {
-                analisisContexto.reportarError(indice.getLinea(), indice.getColumna(), "El índice de un arreglo debe ser int, se encontró "
-                        + Tipos.describir(tipoIndice));
+            if (tipoIndice != null && Tipos.canonico(tipoIndice, analisisContexto) != TipoDato.ENTERO) {
+
+                analisisContexto.reportarError(indice.getLinea(), indice.getColumna(), "El índice de un arreglo debe ser entero, se encontró "
+                        + Tipos.describir(tipoIndice, analisisContexto));
                 continue;
             }
+
 
             if (indice instanceof Literal literal) {
 

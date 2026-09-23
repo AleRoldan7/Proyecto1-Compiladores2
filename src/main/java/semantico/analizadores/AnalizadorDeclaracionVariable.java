@@ -42,7 +42,7 @@ public class AnalizadorDeclaracionVariable implements AnalizadorSemantico<Declar
             if (!Tipos.asignable(nodoVariable.getTipo(), inicio, analisisContexto)) {
 
                 analisisContexto.reportarError(nodoVariable.getLinea(), nodoVariable.getColumna(),  "No se puede inicializar '" + nombre + "' de tipo "
-                        + Tipos.describir(nodoVariable.getTipo()) + " con un valor de tipo " + Tipos.describir(inicio));
+                        + Tipos.describir(nodoVariable.getTipo()) + " con un valor de tipo " + Tipos.describir(inicio, analisisContexto));
             }
         }
     }

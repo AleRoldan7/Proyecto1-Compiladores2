@@ -31,15 +31,12 @@ public class CicloFor extends NodoAST implements Sentencia {
         String etqIncremento = contexto.nuevaEtiqueta();
         String etqFin = contexto.nuevaEtiqueta();
 
-        // continue → etqIncremento, break → etqFin
         contexto.entrarCiclo(etqIncremento, etqFin);
 
-        // Inicialización
         if (inicializacion != null) {
             inicializacion.generarC3D(contexto);
         }
 
-        // Condición
         contexto.agregarEtiqueta(etqInicio);
 
         if (condicionFor != null) {
@@ -48,11 +45,9 @@ public class CicloFor extends NodoAST implements Sentencia {
             contexto.salto(etqCuerpo);
         }
 
-        // Cuerpo
         contexto.agregarEtiqueta(etqCuerpo);
         bloqueFor.generarC3D(contexto);
 
-        // Incremento
         contexto.agregarEtiqueta(etqIncremento);
         if (incremento != null) {
             incremento.generarC3D(contexto);

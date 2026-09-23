@@ -3,6 +3,7 @@ package semantico.coordinadorsemantico;
 import ast.expresiones.Expresion;
 import ast.expresiones.ExpresionBinaria;
 import ast.tipos.Tipo;
+import enums.TipoDato;
 import enums.TipoOperador;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -49,50 +50,57 @@ public class InferirTipoBinario implements InferirTipo<ExpresionBinaria> {
 
     private Tipo inferirAritmetico(ExpresionBinaria nodoBinario, Tipo izquierdo, Tipo derecho, String operador, AnalisisContexto analisisContexto) {
 
-        if ("+".equals(operador) && (esString(izquierdo) || esString(derecho))) {
+        if ("+".equals(operador) && (Tipos.esTexto(izquierdo, analisisContexto) || Tipos.esTexto(derecho,   analisisContexto))) {
 
-            return Tipos.cadena(nodoBinario.getLinea(), nodoBinario.getColumna());
+            return Tipos.simple(nodoBinario.getLinea(), nodoBinario.getColumna(), analisisContexto.getDialecto().nombrarTipo(TipoDato.TEXTO));
         }
 
-        if (!Tipos.esNumerico(izquierdo) || !Tipos.esNumerico(derecho)) {
-            error(nodoBinario, analisisContexto, operador, izquierdo, derecho, "Operandos numericos");
+        if (!Tipos.esNumerico(izquierdo, analisisContexto) || !Tipos.esNumerico(derecho,   analisisContexto)) {
+
+            error(nodoBinario, analisisContexto, operador, izquierdo, derecho, "operandos numéricos");
             return null;
         }
 
-        boolean esDouble = Tipos.DOUBLE.equals(izquierdo.getNombre()) || Tipos.DOUBLE.equals(derecho.getNombre());
+        TipoDato canonIzq = Tipos.canonico(izquierdo, analisisContexto);
+        TipoDato canonDer = Tipos.canonico(derecho,   analisisContexto);
 
-        return esDouble ? Tipos.decimal(nodoBinario.getLinea(), nodoBinario.getColumna()) : Tipos.entero(nodoBinario.getLinea(), nodoBinario.getColumna());
+        TipoDato resultado = (canonIzq == TipoDato.DECIMAL || canonDer == TipoDato.DECIMAL) ? TipoDato.DECIMAL : TipoDato.ENTERO;
+
+        return Tipos.simple(nodoBinario.getLinea(), nodoBinario.getColumna(), analisisContexto.getDialecto().nombrarTipo(resultado));
     }
 
-    private Tipo inferirRelacional(ExpresionBinaria nodoBinario, Tipo izquiedo, Tipo derecho, String operador, AnalisisContexto analisisContexto) {
 
-        if (!Tipos.esNumerico(izquiedo) || !Tipos.esNumerico(derecho)) {
+    private Tipo inferirRelacional(ExpresionBinaria nodoBinario, Tipo izquierdo, Tipo derecho, String operador, AnalisisContexto analisisContexto) {
 
-            error(nodoBinario, analisisContexto, operador, izquiedo, derecho, "operandos numéricos");
+        if (!Tipos.esNumerico(izquierdo, analisisContexto) || !Tipos.esNumerico(derecho,   analisisContexto)) {
+
+            error(nodoBinario, analisisContexto, operador, izquierdo, derecho, "operandos numéricos");
+            return null;
         }
 
-        return Tipos.booleano(nodoBinario.getLinea(), nodoBinario.getColumna());
+        return Tipos.simple(nodoBinario.getLinea(), nodoBinario.getColumna(), analisisContexto.getDialecto().nombrarTipo(TipoDato.BOOLEANO));
+
     }
 
     private Tipo inferirIgualdad(ExpresionBinaria nodoBinario, Tipo izquierdo, Tipo derecho, String operador, AnalisisContexto analisisContexto) {
 
-        if (!Tipos.sonCompatibles(izquierdo, derecho) && !Tipos.sonCompatibles(derecho, izquierdo)) {
+        if (!Tipos.asignable(izquierdo, derecho, analisisContexto) && !Tipos.asignable(derecho,   izquierdo, analisisContexto)) {
 
-            analisisContexto.reportarError(nodoBinario.getLinea(), nodoBinario.getColumna(), "No se puede comparar " + Tipos.describir(izquierdo) +
-                    " con " + Tipos.describir(derecho));
+            analisisContexto.reportarError(nodoBinario.getLinea(), nodoBinario.getColumna(), "No se puede comparar "
+                    + Tipos.describir(izquierdo, analisisContexto) + " con " + Tipos.describir(derecho,   analisisContexto));
         }
 
-        return Tipos.booleano(nodoBinario.getLinea(), nodoBinario.getColumna());
+        return Tipos.simple(nodoBinario.getLinea(), nodoBinario.getColumna(), analisisContexto.getDialecto().nombrarTipo(TipoDato.BOOLEANO));
     }
 
     private Tipo inferirLogico(ExpresionBinaria nodoBinario, Tipo izquierdo, Tipo derecho, String operador, AnalisisContexto analisisContexto) {
 
-        if (!Tipos.esBooleano(izquierdo) || !Tipos.esBooleano(derecho)) {
+        if (!Tipos.esBooleano(izquierdo, analisisContexto) || !Tipos.esBooleano(derecho,   analisisContexto)) {
 
             error(nodoBinario, analisisContexto, operador, izquierdo, derecho, "operandos booleanos");
+            return null;
         }
-
-        return Tipos.booleano(nodoBinario.getLinea(), nodoBinario.getColumna());
+        return Tipos.simple(nodoBinario.getLinea(), nodoBinario.getColumna(), analisisContexto.getDialecto().nombrarTipo(TipoDato.BOOLEANO));
     }
 
     private boolean esString(Tipo tipo) {
@@ -101,7 +109,7 @@ public class InferirTipoBinario implements InferirTipo<ExpresionBinaria> {
 
     private void error(ExpresionBinaria nodoBinario, AnalisisContexto analisisContexto, String operador, Tipo izquierdo, Tipo derecho, String requisito) {
 
-        analisisContexto.reportarError(nodoBinario.getLinea(), nodoBinario.getColumna(), "El operador '" + operador + "' requiere "
-                + requisito + ", se encontró " + Tipos.describir(izquierdo) + " y " + Tipos.describir(derecho));
+        analisisContexto.reportarError(nodoBinario.getLinea(), nodoBinario.getColumna(), "El operador '" + operador + "' requiere " + requisito
+                + ", se encontró " + Tipos.describir(izquierdo, analisisContexto) + " y " + Tipos.describir(derecho,   analisisContexto));
     }
 }

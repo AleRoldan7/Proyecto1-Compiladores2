@@ -30,7 +30,6 @@ public class CondicionIf extends NodoAST implements Sentencia {
     @Override
     public String generarC3D(ContextoC3D contexto) {
 
-        // if
         String etqVerdadero = contexto.nuevaEtiqueta();
         String etqFalso     = contexto.nuevaEtiqueta();
         String etqFin       = contexto.nuevaEtiqueta();
@@ -41,7 +40,6 @@ public class CondicionIf extends NodoAST implements Sentencia {
         bloqueEntonces.generarC3D(contexto);
         contexto.salto(etqFin);
 
-        // else ifs
         String etqFalsoActual = etqFalso;
 
         if (listaSiNoSi != null) {
@@ -70,12 +68,6 @@ public class CondicionIf extends NodoAST implements Sentencia {
         return null;
     }
 
-    /**
-     * Genera el código de una condición booleana con dos etiquetas:
-     * etqV (a donde saltar si es verdadera), etqF (si es falsa).
-     *
-     * Maneja AND, OR, NOT y comparaciones simples.
-     */
     public static void generarCondicion(Expresion cond, ContextoC3D ctx,
                                         String etqV, String etqF) {
 
@@ -113,7 +105,6 @@ public class CondicionIf extends NodoAST implements Sentencia {
             return;
         }
 
-        // Condición simple
         String valor = cond.generarC3D(ctx);
         ctx.saltoSiVerdadero(valor, etqV);
         ctx.salto(etqF);

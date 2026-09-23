@@ -30,10 +30,8 @@ public class CondicionSwitch extends NodoAST implements Sentencia {
         String etqFin = contexto.nuevaEtiqueta();
         contexto.entrarSwitch(etqFin);
 
-        // Evaluar la expresión del switch
         String valorSwitch = expresion.generarC3D(contexto);
 
-        // Para cada caso, comparar y saltar a su etiqueta
         java.util.Map<SentenciaCase, String> etqCaso = new java.util.HashMap<>();
 
         for (SentenciaCase c : casos) {
@@ -46,17 +44,15 @@ public class CondicionSwitch extends NodoAST implements Sentencia {
             contexto.saltoSiVerdadero(cmp, etq);
         }
 
-        // Si ninguno matcheó → ir a default (o fin)
         if (bloqueDefecto != null) {
             bloqueDefecto.generarC3D(contexto);
         }
         contexto.salto(etqFin);
 
-        // Cuerpos de cada caso
         for (SentenciaCase c : casos) {
             contexto.agregarEtiqueta(etqCaso.get(c));
             c.getCuerpoCase().generarC3D(contexto);
-            contexto.salto(etqFin);   // fall-through → salta al fin (no hay fall-through)
+            contexto.salto(etqFin);
         }
 
         contexto.agregarEtiqueta(etqFin);
