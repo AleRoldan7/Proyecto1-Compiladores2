@@ -72,8 +72,15 @@ public class ContextoC3D {
     }
 
     /** destino = valor */
+    /** destino = valor */
     public void asignar(String destino, String valor) {
-        cuartetas.add(new Cuarteta("=", valor, null, destino, null));
+        if (esAtributo(destino)) {
+            int offset = desplazamiento(claseActual, destino);
+            // self.<offset> = valor   →  GenerarCodigoC lo traduce a heap[self+offset] = valor
+            cuartetas.add(new Cuarteta("field_set", String.valueOf(offset), valor, "self", null));
+        } else {
+            cuartetas.add(new Cuarteta("=", valor, null, destino, null));
+        }
     }
 
     public List<Cuarteta> getCuartetas() {
