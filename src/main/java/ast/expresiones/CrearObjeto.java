@@ -4,6 +4,7 @@ import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -18,28 +19,31 @@ public class CrearObjeto extends Expresion {
         this.nombreClase = nombreClase;
         this.argumentos = argumentos;
     }
+
     @Override
     public String generarC3D(ContextoC3D contexto) {
 
-        // 1. Reservar en heap
-        String temporal = contexto.nuevoTemporal();
-        contexto.agregar("new", nombreClase, null, temporal);
+        List<String> lugares = new ArrayList<>();
 
-        // 2. Evaluar argumentos para el constructor
-        if (argumentos != null) {
-            for (Expresion arg : argumentos) {
-                String valor = arg.generarC3D(contexto);
-                contexto.agregar("param", valor, null, null);
+        if (getArgumentos() != null) {
+            for (Expresion argumento : getArgumentos()) {
+                lugares.add(argumento.generarC3D(contexto));
             }
         }
 
-        // 3. Pasar el objeto como self
-        contexto.agregar("param", temporal, null, null);
+        String objeto = contexto.nuevoTemporal();
+        contexto.agregar("new", getNombreClase(), String.valueOf(contexto.tamanio(getNombreClase())), objeto);
 
-        // 4. Llamar al constructor
-        int cantidadArgs = ((argumentos == null) ? 0 : argumentos.size()) + 1;
-        contexto.agregar("call", "init_" + nombreClase, String.valueOf(cantidadArgs), null);
+        String constructor = ContextoC3D.nombreConstructor(getNombreClase());
 
-        return temporal;
+        if (contexto.existeFuncion(constructor)) {
+            contexto.agregar("param", objeto, null, null);
+            for (String lugar : lugares) {
+                contexto.agregar("param", lugar, null, null);
+            }
+            contexto.agregar("call", constructor, String.valueOf(lugares.size() + 1), null);
+        }
+
+        return objeto;
     }
 }

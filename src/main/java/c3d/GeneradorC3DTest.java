@@ -225,26 +225,27 @@ public class GeneradorC3DTest {
             // ============================================================
 
             System.out.println("\n=== CÓDIGO DE TRES DIRECCIONES ===");
-            System.out.println(c3d.comoTexto());
+            //System.out.println(c3d.comoTexto());
 
             // ============================================================
             // 6. Tabla de strings (para el paso a C)
             // ============================================================
 
+            /*
             if (!c3d.getTablaStrings().isEmpty()) {
                 System.out.println("\n=== TABLA DE STRINGS ===");
                 c3d.getTablaStrings().forEach((nombre, valor) ->
                         System.out.println("    " + nombre + " = \"" + valor + "\""));
             }
-
+*/
             // ============================================================
             // 7. Funciones registradas (para forward decls en C)
             // ============================================================
 
-            if (!c3d.getFuncionesGeneradas().isEmpty()) {
-                System.out.println("\n=== FUNCIONES GENERADAS ===");
-                c3d.getFuncionesGeneradas().forEach(f -> System.out.println("    " + f));
-            }
+            //if (!c3d.getFuncionesGeneradas().isEmpty()) {
+               // System.out.println("\n=== FUNCIONES GENERADAS ===");
+              //  c3d.getFuncionesGeneradas().forEach(f -> System.out.println("    " + f));
+           // }
 
             // ============================================================
             // 8. Volcar el C3D a un archivo

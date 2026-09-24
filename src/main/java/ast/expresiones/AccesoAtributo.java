@@ -17,15 +17,16 @@ public class AccesoAtributo extends Expresion {
         this.atributo = atributo;
     }
 
+    public int desplazamiento(ContextoC3D contexto) {
+        boolean esThis = objeto instanceof Identificador id && "this".equals(id.getNombreIdentificador());
+        return contexto.desplazamientoDe(esThis ? contexto.getClaseActual() : null, atributo);
+    }
+
     @Override
     public String generarC3D(ContextoC3D contexto) {
-
-        String obj = objeto.generarC3D(contexto);
-
-        // Puntero al atributo: obj->atributo
+        String objeto = getObjeto().generarC3D(contexto);
         String temporal = contexto.nuevoTemporal();
-        contexto.agregar("attr_get", obj, atributo, temporal);
-
+        contexto.agregar("attr_get", objeto, String.valueOf(desplazamiento(contexto)), temporal);
         return temporal;
     }
 }

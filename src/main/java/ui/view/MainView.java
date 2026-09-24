@@ -2,6 +2,9 @@ package ui.view;
 
 import analisis.CompiladorProyecto;
 import analisis.ResultadoProyecto;
+import c3d.Cuarteta;
+import c3d.GeneradorC3DCompleto;
+import c3d.GenerarCodigoC;
 import enums.TipoArchivo;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -22,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +44,9 @@ public class MainView extends BorderPane {
 
     private final CompiladorProyecto compiladorProyecto = new CompiladorProyecto();
     private ResultadoProyecto resultadoProyecto;
+    private Button btnGenerarC3D;
+    private Map<TipoArchivo, List<File>> archivosCompilados;
+    private boolean compilacionVigente = false;   // true solo si la última compilación fue sin errores y no se ha editado nada
     private final ConsolaErrores consolaErrores = new ConsolaErrores();
 
     /** Una pestaña por archivo abierto, para poder tener los 3 lenguajes a la vista al mismo tiempo. */
@@ -197,16 +204,18 @@ public class MainView extends BorderPane {
 
         Button buttonCompilarProyecto = new Button("Compilar Proyecto");
         Button buttonSimbolos = new Button("Tabla Símbolos");
-        Button buttonC3d = new Button("Generar C3D");
+        //Button buttonC3d = new Button("Generar C3D");
+        btnGenerarC3D = new Button("Generar C3D");
+        btnGenerarC3D.setDisable(true);          // se habilita al compilar sin errores
 
         estilizarBoton(buttonArchivo);
         estilizarBotonPrincipal(buttonCompilarProyecto);
         estilizarBoton(buttonSimbolos);
-        estilizarBoton(buttonC3d);
+        estilizarBoton(btnGenerarC3D);
 
         buttonCompilarProyecto.setOnAction(e -> onCompilarProyecto());
         buttonSimbolos.setOnAction(e -> onMostrarSimbolos());
-        buttonC3d.setOnAction(e -> onGenerarC3D());
+        btnGenerarC3D.setOnAction(e -> onGenerarC3D());
 
         Region espaciador = new Region();
         HBox.setHgrow(espaciador, Priority.ALWAYS);
@@ -216,7 +225,7 @@ public class MainView extends BorderPane {
 
         menu.getChildren().addAll(
                 tituloBox, separador,
-                buttonArchivo, buttonCompilarProyecto, buttonSimbolos, buttonC3d,
+                buttonArchivo, buttonCompilarProyecto, buttonSimbolos, btnGenerarC3D,
                 espaciador, insigniaEstado
         );
     }
@@ -453,6 +462,10 @@ public class MainView extends BorderPane {
         archivosPorTipo.values().forEach(lista ->
                 lista.forEach(f -> archivosProyectoPorNombre.put(f.getName(), f)));
 
+        compilacionVigente = false;
+        btnGenerarC3D.setDisable(true);
+        archivosCompilados = archivosPorTipo;
+
         mostrarEstado("Analizando los 3 archivos...", TEXTO_SECUNDARIO);
 
         try {
@@ -460,6 +473,12 @@ public class MainView extends BorderPane {
 
             consolaErrores.mostrarErrores(resultadoProyecto.getErrores());
             mostrarVista(consolaErrores);
+
+            boolean sinErrores = resultadoProyecto.isCorrecto()
+                    && compiladorProyecto.proyectoSinErrores(archivosPorTipo, resultadoProyecto);
+
+            compilacionVigente = sinErrores;
+            btnGenerarC3D.setDisable(!sinErrores);
 
             if (resultadoProyecto.isCorrecto()) {
                 mostrarEstado("✓ Los 3 archivos compilan correctamente", EXITO);
@@ -547,7 +566,89 @@ public class MainView extends BorderPane {
     }
 
     private void onGenerarC3D() {
+
+        if (!compilacionVigente || resultadoProyecto == null || archivosCompilados == null) {
+            mostrarError("Compila el proyecto sin errores antes de generar el C3D");
+            return;
+        }
+
+        File principal = elegirPigPrincipal();
+        if (principal == null) {
+            return;
+        }
+
         mostrarEstado("Generando C3D...", TEXTO_SECUNDARIO);
+
+        try {
+            List<GeneradorC3DCompleto.ArchivoFuente> fuentes =
+                    compiladorProyecto.archivosParaC3D(principal, archivosCompilados, resultadoProyecto);
+
+            List<Cuarteta> cuartetas = GeneradorC3DCompleto.generar(fuentes);
+
+            String nombreBase = principal.getName().replaceFirst("\\.pig$", "");
+            Path carpetaSalida = principal.getAbsoluteFile().getParentFile().toPath().resolve("salida");
+
+            GeneradorC3DCompleto.exportar(carpetaSalida, nombreBase, cuartetas);   // escribe .c3d y .c
+
+            mostrarVista(crearVistaC3D(
+                    GeneradorC3DCompleto.comoTexto(cuartetas),
+                    GenerarCodigoC.traducir(cuartetas)));
+
+            mostrarEstado("✓ C3D generado en la carpeta salida/", EXITO);
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            mostrarError("No se pudo generar el C3D: " + ex.getMessage());
+        }
+    }
+
+    /** El .pig abierto si lo es; si no, el único del proyecto; si hay varios, se pregunta. */
+    private File elegirPigPrincipal() {
+
+        List<File> pigs = archivosCompilados.getOrDefault(TipoArchivo.PIG_LATIN, List.of());
+
+        if (pigs.isEmpty()) {
+            mostrarError("El proyecto no tiene ningún archivo .pig como programa principal");
+            return null;
+        }
+
+        PestanaEditor activa = pestanaActiva();
+        if (activa != null && activa.archivo != null && pigs.contains(activa.archivo)) {
+            return activa.archivo;
+        }
+
+        if (pigs.size() == 1) {
+            return pigs.get(0);
+        }
+
+        ChoiceDialog<File> dialogo = new ChoiceDialog<>(pigs.get(0), pigs);
+        dialogo.setTitle("Generar C3D");
+        dialogo.setHeaderText("Hay varios archivos .pig en el proyecto");
+        dialogo.setContentText("Archivo principal:");
+
+        return dialogo.showAndWait().orElse(null);
+    }
+
+    private TabPane crearVistaC3D(String c3d, String codigoC) {
+        TabPane pestanas = new TabPane();
+        pestanas.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        pestanas.getTabs().addAll(
+                new Tab("C3D", crearAreaSalida(c3d)),
+                new Tab("Código C", crearAreaSalida(codigoC))
+        );
+        return pestanas;
+    }
+
+    private TextArea crearAreaSalida(String texto) {
+        TextArea area = new TextArea(texto);
+        area.setEditable(false);
+        area.setStyle(
+                "-fx-font-family: 'Consolas', 'Courier New', monospace;" +
+                        "-fx-font-size: 13px;" +
+                        "-fx-control-inner-background: #141414;" +
+                        "-fx-text-fill: " + TEXTO + ";"
+        );
+        return area;
     }
 
     private void mostrarVista(Node node) {
@@ -694,5 +795,18 @@ public class MainView extends BorderPane {
             activa = pestanaActiva();
         }
         activa.area.replaceText(texto);
+    }
+
+    private void escucharCambios(CodeArea area) {
+        area.textProperty().addListener((obs, anterior, nuevo) -> invalidarCompilacion());
+    }
+
+    /** Si el texto del editor cambia, lo compilado ya no coincide con lo que ves. */
+    private void invalidarCompilacion() {
+        if (compilacionVigente) {
+            compilacionVigente = false;
+            btnGenerarC3D.setDisable(true);
+            mostrarEstado("Código modificado: vuelve a compilar", TEXTO_SECUNDARIO);
+        }
     }
 }

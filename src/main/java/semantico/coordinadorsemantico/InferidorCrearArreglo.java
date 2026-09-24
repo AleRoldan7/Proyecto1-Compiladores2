@@ -24,7 +24,6 @@ public class InferidorCrearArreglo implements InferirTipo<CrearArreglo> {
     @Override
     public Tipo inferir(CrearArreglo nodoArreglo, AnalisisContexto analisisContexto) {
 
-        // FIX: evitar NullPointerException si getDimensiones() es null
         List<Expresion> dimensiones = nodoArreglo.getDimensiones() == null ? Collections.emptyList() : nodoArreglo.getDimensiones();
 
         for (Expresion dimension : dimensiones) {
@@ -35,7 +34,6 @@ public class InferidorCrearArreglo implements InferirTipo<CrearArreglo> {
 
             Tipo tipoDimension = inferirTipoCoordinador.inferir(dimension, analisisContexto);
 
-            // FIX: usar el dialecto para saber si es entero
             if (tipoDimension != null && Tipos.canonico(tipoDimension, analisisContexto) != TipoDato.ENTERO) {
 
                 analisisContexto.reportarError(dimension.getLinea(), dimension.getColumna(),"La dimensión de un arreglo debe ser entero, se encontró "
@@ -43,7 +41,6 @@ public class InferidorCrearArreglo implements InferirTipo<CrearArreglo> {
             }
         }
 
-        // FIX: evitar NullPointerException si getValoresIniciales() es null
         List<Expresion> valoresIniciales = nodoArreglo.getValoresIniciales() == null ? Collections.emptyList() : nodoArreglo.getValoresIniciales();
 
         if (!valoresIniciales.isEmpty()) {
@@ -55,7 +52,6 @@ public class InferidorCrearArreglo implements InferirTipo<CrearArreglo> {
 
                 Tipo tipoElemento = inferirTipoCoordinador.inferir(elemento, analisisContexto);
 
-                // FIX: usar asignable(.., contexto)
                 if (!Tipos.asignable(tipoBase, tipoElemento, analisisContexto)) {
                     analisisContexto.reportarError(elemento.getLinea(), elemento.getColumna(),"Elemento de tipo "
                             + Tipos.describir(tipoElemento, analisisContexto) + " no es compatible con el arreglo de tipo "
@@ -64,7 +60,6 @@ public class InferidorCrearArreglo implements InferirTipo<CrearArreglo> {
             }
         }
 
-        // FIX: usar la lista ya calculada
         int dims = dimensiones.size();
 
         StringBuilder nombre = new StringBuilder(nodoArreglo.getTipoBase());

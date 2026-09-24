@@ -1,6 +1,7 @@
 package ast.sentencias;
 
 import ast.expresiones.AccesoArreglo;
+import ast.expresiones.Almacenamiento;
 import ast.expresiones.Expresion;
 import c3d.ContextoC3D;
 import lombok.Getter;
@@ -21,24 +22,9 @@ public class Asignacion extends Expresion {
 
     @Override
     public String generarC3D(ContextoC3D contexto) {
-
-        // Caso especial: asignación a arreglo → index_set
-        if (destino instanceof AccesoArreglo acceso) {
-
-            String valorStr = valor.generarC3D(contexto);
-            String arrStr = acceso.getArreglo().generarC3D(contexto);
-            String indiceStr = generarIndiceAplanado(acceso, contexto);
-
-            contexto.agregar("index_set", arrStr, indiceStr, valorStr);
-            return valorStr;
-        }
-
-        // Caso normal: variable simple
-        String valorStr = valor.generarC3D(contexto);
-        String destinoStr = destino.generarC3D(contexto);
-
-        contexto.asignar(destinoStr, valorStr);
-        return destinoStr;
+        String valor = getValor().generarC3D(contexto);
+        Almacenamiento.guardar(getDestino(), valor, contexto);
+        return valor;
     }
 
     private String generarIndiceAplanado(AccesoArreglo acceso, ContextoC3D contexto) {

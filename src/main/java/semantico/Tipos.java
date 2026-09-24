@@ -1,9 +1,14 @@
 package semantico;
 
 import ast.tipos.Tipo;
+import enums.TipoArchivo;
+import semantico.dialecto.Dialecto;
+import semantico.dialecto.Dialectos;
 import tablas.MetodoRecord;
 import enums.TipoDato;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 public class Tipos {
@@ -17,6 +22,7 @@ public class Tipos {
     public static final String NULL = "null";
 
     private static final Set<String> NUMERICOS = Set.of(INT, DOUBLE);
+    private static List<Dialecto> dialectosValidos;
 
     private Tipos() {
     }
@@ -57,14 +63,7 @@ public class Tipos {
         return tipo != null && NULL.equals(tipo.getNombre());
     }
 
-    /**
-     * ¿Se puede usar 'real' en un lugar que espera 'esperado'?
-     *
-     * Reglas:
-     *  - Mismo nombre, mismo arreglo, misma cantidad de dimensiones -> sí.
-     *  - Promoción numérica: int encaja donde se espera double.
-     *  - null encaja en cualquier tipo objeto/arreglo (no en primitivos).
-     */
+
     public static boolean sonCompatibles(Tipo esperado, Tipo real) {
 
         if (esperado == null || real == null) {
@@ -87,7 +86,6 @@ public class Tipos {
             return true;
         }
 
-        // int -> double, solo para tipo simple (no arreglo)
         return !esperado.isArreglo() && DOUBLE.equals(esperado.getNombre()) && INT.equals(real.getNombre());
     }
 
@@ -141,11 +139,7 @@ public class Tipos {
     }
 
 
-    /**
-     * Construye el Tipo de un arreglo a partir del tipo base y la
-     * cantidad de dimensiones (usado por CrearArreglo y por
-     * AccesoArreglo cuando quedan dimensiones sin indexar).
-     */
+
     public static Tipo arreglo(int linea, int columna, String tipoBase, int dimensiones) {
 
         StringBuilder nombre = new StringBuilder(tipoBase);
@@ -158,9 +152,9 @@ public class Tipos {
     }
 
     public static MetodoRecord resolverSobrecarga(
-            java.util.List<MetodoRecord> candidatos, java.util.List<Tipo> tiposArgumentos) {
+            List<MetodoRecord> candidatos, List<Tipo> tiposArgumentos, AnalisisContexto contexto) {
 
-        for (tablas.MetodoRecord candidato : candidatos) {
+        for (MetodoRecord candidato : candidatos) {
 
             if (candidato.parametros().size() != tiposArgumentos.size()) {
                 continue;
@@ -171,9 +165,8 @@ public class Tipos {
             for (int i = 0; i < tiposArgumentos.size(); i++) {
 
                 Tipo esperado = candidato.parametros().get(i).getTipoParametro();
-                Tipo real = tiposArgumentos.get(i);
 
-                if (!sonCompatibles(esperado, real)) {
+                if (!asignable(esperado, tiposArgumentos.get(i), contexto)) {
                     todosCompatibles = false;
                     break;
                 }
@@ -184,51 +177,64 @@ public class Tipos {
             }
         }
 
-        return null; // ninguna firma matchea
+        return null;
     }
 
-    /* =====================================================================
-       ============ API NUEVA: TIPOS RESUELTOS POR DIALECTO =================
-       =====================================================================
 
-       Los métodos de arriba siguen existiendo porque los usan los
-       Inferidor y Analizador actuales, PERO tienen los nombres de Java
-       hardcodeados ("int", "String"...), así que solo funcionan para
-       Zetariano. Los de abajo son los que sirven para los tres lenguajes:
-       en vez de comparar contra literales, traducen el nombre escrito en
-       el archivo a TipoDato usando el Dialecto del contexto.
-
-       Regla práctica al migrar un analizador: donde hoy dice
-           Tipos.esNumerico(t)
-       debería decir
-           Tipos.esNumerico(t, contexto)
-       y donde dice
-           Tipos.sonCompatibles(esperado, real)
-       debería decir
-           Tipos.asignable(esperado, real, contexto)
-     */
-
-    /** Tipo canónico de un Tipo del AST, según el dialecto activo. */
     public static TipoDato canonico(Tipo tipo, AnalisisContexto contexto) {
 
         if (tipo == null) {
             return null;
         }
 
-        /*
-         * Un arreglo no es un primitivo: su "tipo canónico" solo tiene
-         * sentido cuando se lo indexa. Acá devolvemos el del elemento.
-         */
-        TipoDato primitivo = contexto.getDialecto().tipoPrimitivo(base(tipo));
+        String nombre = base(tipo);
 
+        // 1. Nombres del dialecto del archivo que se analiza ahora (numerus en .pig)
+        TipoDato primitivo = contexto.getDialecto().tipoPrimitivo(nombre);
         if (primitivo != null) {
             return primitivo;
         }
 
-        // No es primitivo -> es una clase o estructura del usuario.
-        return contexto.getTablaTipos().existeTipo(base(tipo))
-                ? TipoDato.OBJETO
-                : null;
+        // 2. Nombres que vienen de otro archivo importado (Pila.z devuelve "int")
+        primitivo = primitivoDeCualquierDialecto(nombre);
+        if (primitivo != null) {
+            return primitivo;
+        }
+
+        // 3. Clases
+        return contexto.getTablaTipos().existeTipo(nombre) ? TipoDato.OBJETO : null;
+    }
+
+    private static List<Dialecto> dialectosValidos() {
+
+        if (dialectosValidos == null) {
+
+            List<Dialecto> lista = new ArrayList<>();
+
+            for (TipoArchivo archivo : TipoArchivo.values()) {
+                try {
+                    lista.add(Dialectos.de(archivo));
+                } catch (RuntimeException e) {
+                    // Tipo de archivo sin dialecto (DESCONOCIDO): se omite
+                }
+            }
+
+            dialectosValidos = lista;
+        }
+
+        return dialectosValidos;
+    }
+
+    private static TipoDato primitivoDeCualquierDialecto(String nombre) {
+
+        for (Dialecto dialecto : dialectosValidos()) {
+            TipoDato tipoDato = dialecto.tipoPrimitivo(nombre);
+            if (tipoDato != null) {
+                return tipoDato;
+            }
+        }
+
+        return null;
     }
 
     public static boolean esNumerico(Tipo tipo, AnalisisContexto contexto) {
@@ -254,10 +260,7 @@ public class Tipos {
         return tipo == null || tipo.isArreglo();
     }
 
-    /**
-     * ¿Se puede asignar 'real' a algo declarado 'esperado'?
-     * Delega la promoción implícita al dialecto.
-     */
+
     public static boolean asignable(Tipo esperado, Tipo real, AnalisisContexto contexto) {
 
         if (esperado == null || real == null) {
@@ -265,7 +268,6 @@ public class Tipos {
         }
 
         if (esNull(real)) {
-            // null solo entra en referencias y arreglos.
             return esperado.isArreglo() || canonico(esperado, contexto) == TipoDato.OBJETO;
         }
 
@@ -278,7 +280,6 @@ public class Tipos {
                     && base(esperado).equals(base(real));
         }
 
-        // Mismo nombre escrito -> compatible (cubre clases del usuario).
         if (base(esperado).equals(base(real))) {
             return true;
         }
@@ -289,10 +290,7 @@ public class Tipos {
         );
     }
 
-    /**
-     * Tipo resultante de un operador binario, o null si la operación no
-     * es válida. Esta es la consulta que debería hacer InferirTipoBinario.
-     */
+
     public static Tipo resultadoBinario(String operador, Tipo izquierda, Tipo derecha,
                                         int linea, int columna, AnalisisContexto contexto) {
 
@@ -313,7 +311,6 @@ public class Tipos {
         return simple(linea, columna, contexto.getDialecto().nombrarTipo(resultado));
     }
 
-    /** Describe un tipo en el idioma del lenguaje que se está analizando. */
     public static String describir(Tipo tipo, AnalisisContexto contexto) {
 
         if (tipo == null) {

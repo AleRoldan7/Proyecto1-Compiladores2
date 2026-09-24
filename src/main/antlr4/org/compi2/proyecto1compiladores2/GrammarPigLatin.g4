@@ -33,6 +33,7 @@ declaracionVariable:
 tipo:
     tipoDato
     | ID
+    | NOVUS ID PARENTESIS_ABRE listaArgumentos? PARENTESIS_CIERRA
     ;
 
 tipoDato:

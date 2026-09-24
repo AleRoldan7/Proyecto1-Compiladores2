@@ -5,6 +5,7 @@ import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -29,7 +30,14 @@ public class Clase extends NodoAST {
     public String generarC3D(ContextoC3D contexto) {
         for (Metodo m : metodos) m.generarC3D(contexto);
         for (Constructor c : constructores) c.generarC3D(contexto);
-        // NO emitir comment ni halt aquí
         return null;
+    }
+
+    public void registrarDisposicion(ContextoC3D contexto) {
+        List<String> nombres = new ArrayList<>();
+        for (var atributo : atributos) {                 // ADAPTA: nombre real de la lista de atributos
+            nombres.add(atributo.getNombreAtributo());           // ADAPTA: getter real del nombre
+        }
+        contexto.registrarClase(nombreClase, nombres);
     }
 }

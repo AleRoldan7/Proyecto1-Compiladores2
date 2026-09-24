@@ -27,18 +27,84 @@ public class AnalizadorClase implements AnalizadorSemantico<Clase> {
 
     private final AnalizadorSemanticoCoordinador coordinador;
 
+
+    public void registrarFirma(Clase nodoClase, AnalisisContexto analisisContexto) {
+
+        String nombreClase = nodoClase.getNombreClase();
+
+        if (analisisContexto.getTablaTipos().existeTipo(nombreClase)) {
+            return;
+        }
+
+        InformeTipo infoClase = new InformeTipo(nombreClase, TipoDato.OBJETO);
+
+        for (var atributo : nodoClase.getAtributos()) {
+            infoClase.agregarAtributo(
+                    atributo.getNombreAtributo(),
+                    atributo.getTipo()
+            );
+        }
+
+        for (Metodo metodo : nodoClase.getMetodos()) {
+            infoClase.agregarMetodo(new MetodoRecord(
+                    metodo.getNombreMetodo(),
+                    metodo.getTipoRetorno(),
+                    metodo.getParametros()
+            ));
+        }
+
+        for (Constructor constructor : nodoClase.getConstructores()) {
+            infoClase.agregarConstructor(new MetodoRecord(
+                    nombreClase,
+                    null,
+                    constructor.getParametros()
+            ));
+        }
+
+        analisisContexto.getTablaTipos().registrar(infoClase);
+    }
+
     @Override
     public void analizar(Clase nodoClase, AnalisisContexto analisisContexto) {
 
         String nombreClase = nodoClase.getNombreClase();
 
-        if (analisisContexto.getTablaTipos().existeTipo(nombreClase)) {
-            analisisContexto.reportarError(nodoClase.getLinea(), nodoClase.getColumna(),
-                    "El tipo '" + nombreClase + "' ya esta definido");
-        }
 
-        InformeTipo infoClase = new InformeTipo(nombreClase, TipoDato.OBJETO);
-        analisisContexto.getTablaTipos().registrar(infoClase);
+        InformeTipo infoClase;
+
+        if (analisisContexto.getTablaTipos().existeTipo(nombreClase)) {
+
+            infoClase = analisisContexto.getTablaTipos().obtener(nombreClase);
+
+        } else {
+
+            infoClase = new InformeTipo(nombreClase, TipoDato.OBJETO);
+
+            for (var atributo : nodoClase.getAtributos()) {
+                infoClase.agregarAtributo(
+                        atributo.getNombreAtributo(),
+                        atributo.getTipo()
+                );
+            }
+
+            for (Metodo metodo : nodoClase.getMetodos()) {
+                infoClase.agregarMetodo(new MetodoRecord(
+                        metodo.getNombreMetodo(),
+                        metodo.getTipoRetorno(),
+                        metodo.getParametros()
+                ));
+            }
+
+            for (Constructor constructor : nodoClase.getConstructores()) {
+                infoClase.agregarConstructor(new MetodoRecord(
+                        nombreClase,
+                        null,
+                        constructor.getParametros()
+                ));
+            }
+
+            analisisContexto.getTablaTipos().registrar(infoClase);
+        }
 
         InformeTipo claseAnterior = analisisContexto.getClaseActual();
         analisisContexto.setClaseActual(infoClase);
@@ -46,15 +112,6 @@ public class AnalizadorClase implements AnalizadorSemantico<Clase> {
         analisisContexto.getTablaSimbolos().entrarAmbito("Clase " + nombreClase);
         validarMetodosDuplicados(nodoClase.getMetodos(), analisisContexto);
         validarConstructoresDuplicados(nodoClase.getConstructores(), nombreClase, analisisContexto);
-
-
-        for (Metodo metodo : nodoClase.getMetodos()) {
-            infoClase.agregarMetodo(new MetodoRecord(metodo.getNombreMetodo(), metodo.getTipoRetorno(), metodo.getParametros()));
-        }
-
-        for (Constructor constructor : nodoClase.getConstructores()) {
-            infoClase.agregarConstructor(new MetodoRecord(nombreClase, null, constructor.getParametros()));
-        }
 
         nodoClase.getAtributos().forEach(a -> coordinador.analizar(a, analisisContexto));
         nodoClase.getConstructores().forEach(c -> coordinador.analizar(c, analisisContexto));
@@ -83,7 +140,6 @@ public class AnalizadorClase implements AnalizadorSemantico<Clase> {
             }
         }
     }
-
 
 
     private void validarConstructoresDuplicados(List<Constructor> constructores, String nombreClase, AnalisisContexto analisisContexto) {

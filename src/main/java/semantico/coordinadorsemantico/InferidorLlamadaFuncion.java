@@ -3,78 +3,101 @@ package semantico.coordinadorsemantico;
 import ast.expresiones.Expresion;
 import ast.expresiones.LlamadaFuncion;
 import ast.tipos.Tipo;
+import enums.Categoria;
 import enums.TipoDato;
 import lombok.AllArgsConstructor;
 import semantico.AnalisisContexto;
 import semantico.Tipos;
 import semantico.interfazsemantica.InferirTipo;
+import tablas.FilaTabla;
 import tablas.InformeTipo;
 import tablas.MetodoRecord;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 @AllArgsConstructor
 public class InferidorLlamadaFuncion implements InferirTipo<LlamadaFuncion> {
 
+    private static final Set<String> LECTURAS = Set.of("readln", "leer");
+    private static final Set<String> IMPRESIONES = Set.of("print", "println", "imprimir");
+
     private final InferirTipoCoordinador inferirTipoCoordinador;
+
+    public static boolean esLectura(String nombre) {
+        return LECTURAS.contains(nombre);
+    }
 
     @Override
     public Tipo inferir(LlamadaFuncion nodoLlamada, AnalisisContexto analisisContexto) {
 
-        // FIX: guarda defensiva contra argumentos null
-        List<Expresion> argumentos = nodoLlamada.getArgumentos() == null ? Collections.emptyList() : nodoLlamada.getArgumentos();
+        String nombre = nodoLlamada.getNombre();
+        int linea = nodoLlamada.getLinea();
+        int columna = nodoLlamada.getColumna();
+
+        // 1. Tipos de los argumentos (lista nula = sin argumentos)
+        List<Expresion> argumentos = nodoLlamada.getArgumentos() == null
+                ? List.of() : nodoLlamada.getArgumentos();
 
         List<Tipo> tiposArgumentos = new ArrayList<>();
+        boolean argumentosValidos = true;
 
         for (Expresion argumento : argumentos) {
-            tiposArgumentos.add(inferirTipoCoordinador.inferir(argumento, analisisContexto));
+            Tipo tipo = inferirTipoCoordinador.inferir(argumento, analisisContexto);
+            if (tipo == null) {
+                argumentosValidos = false;   // el error ya se reportó, no lo repetimos
+            }
+            tiposArgumentos.add(tipo);
         }
 
-        /*
-         * FIX: usar el dialecto para nombrar los tipos de retorno.
-         * Antes se devolvía Tipos.STRING ("String"), lo cual rompía
-         * en Pig Latin donde el tipo se llama "textum".
-         */
-        String nombreTexto = analisisContexto.getDialecto().nombrarTipo(TipoDato.TEXTO);
-
-        if ("readln".equals(nodoLlamada.getNombre())) {
-            return Tipos.simple(nodoLlamada.getLinea(), nodoLlamada.getColumna(), nombreTexto);
+        // 2. Funciones predefinidas
+        if (esLectura(nombre)) {
+            String nombreTexto = analisisContexto.getDialecto().nombrarTipo(TipoDato.TEXTO);
+            return Tipos.simple(linea, columna, nombreTexto);
         }
 
-        if ("leer".equals(nodoLlamada.getNombre())) {
-            return Tipos.simple(nodoLlamada.getLinea(), nodoLlamada.getColumna(), nombreTexto);
+        if (IMPRESIONES.contains(nombre)) {
+            return Tipos.simple(linea, columna, Tipos.VOID);
         }
 
-        if ("print".equals(nodoLlamada.getNombre()) || "println".equals(nodoLlamada.getNombre()) || "imprimir".equals(nodoLlamada.getNombre())) {
-
-            // FIX: si el dialecto no tiene NIHIL (Pig Latin), devolver null
-            //      (sin tipo de retorno). El llamador debe tolerar null.
-
-            return Tipos.simple(nodoLlamada.getLinea(), nodoLlamada.getColumna(), Tipos.VOID);
+        if (!argumentosValidos) {
+            return null;
         }
 
+        // 3. Método de la clase actual (.z)
         InformeTipo claseActual = analisisContexto.getClaseActual();
 
-        if (claseActual == null || !claseActual.tieneMetodo(nodoLlamada.getNombre())) {
+        if (claseActual != null && claseActual.tieneMetodo(nombre)) {
+            nodoLlamada.setMetodoDeClase(true);
+            MetodoRecord firma = Tipos.resolverSobrecarga(
+                    claseActual.firmasDe(nombre), tiposArgumentos, analisisContexto);
 
-            analisisContexto.reportarError(nodoLlamada.getLinea(), nodoLlamada.getColumna(),
-                    "Método '" + nodoLlamada.getNombre() + "' no declarado en la clase");
+            if (firma == null) {
+                analisisContexto.reportarError(linea, columna,
+                        "No existe una versión de '" + nombre + "' que reciba esos argumentos");
+                return null;
+            }
+
+            Tipo retorno = firma.tipoRetorno();
+            return retorno != null ? retorno : Tipos.simple(linea, columna, Tipos.VOID);
+        }
+
+        // 4. Función global: de este archivo o importada de un .y
+        FilaTabla fila = analisisContexto.getTablaSimbolos().buscar(nombre);
+
+        if (fila == null || fila.getCategoria() != Categoria.FUNCION) {
+            analisisContexto.reportarError(linea, columna,
+                    "Función '" + nombre + "' no declarada (ni en la clase actual ni en los archivos importados)");
             return null;
         }
 
-        MetodoRecord firma = Tipos.resolverSobrecarga(
-                claseActual.firmasDe(nodoLlamada.getNombre()),
-                tiposArgumentos);
+        String textoRetorno = fila.getTipo();   // ASUNCIÓN: FilaTabla tiene getTipo()
 
-        if (firma == null) {
-
-            analisisContexto.reportarError(nodoLlamada.getLinea(), nodoLlamada.getColumna(),
-                    "No existe una versión de '" + nodoLlamada.getNombre() + "' que reciba esos argumentos");
-            return null;
+        if (textoRetorno == null || textoRetorno.isBlank()) {
+            return Tipos.simple(linea, columna, Tipos.VOID);
         }
 
-        return firma.tipoRetorno();
+        return Tipos.desdeTexto(linea, columna, textoRetorno);
     }
 }

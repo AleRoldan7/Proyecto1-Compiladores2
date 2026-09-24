@@ -21,13 +21,7 @@ import semantico.AnalisisContexto;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Construye el AST de Pig Latin (.pig) a partir del arbol de ANTLR.
- *
- * Pig Latin es el lenguaje de ARRANQUE: tiene imports, una seccion
- * opcional de variables globales (VARIABILES) y una seccion main
- * obligatoria (MAIOR).
- */
+
 public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
 
     private final AnalisisContexto analisisContexto;
@@ -35,10 +29,6 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
     public VisitorPigLatin(AnalisisContexto contexto) {
         this.analisisContexto = contexto;
     }
-
-    /* =========================================================
-       ======================= PROGRAMA ========================
-       ========================================================= */
 
     @Override
     public NodoAST visitProgram(GrammarPigLatinParser.ProgramContext ctx) {
@@ -74,15 +64,7 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
             }
         }
 
-        return new Programa(
-                linea(ctx),
-                columna(ctx),
-                importaciones,
-                new ArrayList<Estructura>(),
-                new ArrayList<Clase>(),
-                funciones,
-                globales
-        );
+        return new Programa(linea(ctx), columna(ctx), importaciones, new ArrayList<Estructura>(), new ArrayList<Clase>(), funciones, globales);
     }
 
     private String construirRutaImport(GrammarPigLatinParser.SeccionImportContext ctx) {
@@ -115,33 +97,42 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
         );
     }
 
-    /* =========================================================
-       ===================== DECLARACIONES =====================
-       ========================================================= */
 
     @Override
     public NodoAST visitDeclaracionVariable(GrammarPigLatinParser.DeclaracionVariableContext ctx) {
 
-        Tipo tipo = construirTipo(ctx.tipo());
-        String nombre = ctx.ID().getText();
-
+        Tipo tipo;
         Expresion inicializacion = null;
 
-        if (ctx.expresion() != null) {
+        if (ctx.tipo().NOVUS() != null) {
 
-            inicializacion = (Expresion) visit(ctx.expresion());
+            String nombreClase = ctx.tipo().ID().getText();
 
-        } else if (ctx.inicializacionStruct() != null) {
+            tipo = new Tipo(linea(ctx), columna(ctx), nombreClase, false, 0);
 
-            inicializacion = construirInicializacionStruct(
-                    ctx.inicializacionStruct(), tipo.getNombre());
+            List<Expresion> argumentos = construirArgumentos(ctx.tipo().listaArgumentos());
+
+            inicializacion = new CrearObjeto(
+                    linea(ctx), columna(ctx),
+                    nombreClase,
+                    argumentos
+            );
+        }
+        else {
+            tipo = construirTipo(ctx.tipo());
+
+            if (ctx.expresion() != null) {
+                inicializacion = (Expresion) visit(ctx.expresion());
+            } else if (ctx.inicializacionStruct() != null) {
+                inicializacion = construirInicializacionStruct(
+                        ctx.inicializacionStruct(), tipo.getNombre());
+            }
         }
 
         return new DeclaracionVariable(
-                linea(ctx),
-                columna(ctx),
+                linea(ctx), columna(ctx),
                 tipo,
-                nombre,
+                ctx.ID().getText(),
                 inicializacion
         );
     }
@@ -151,22 +142,14 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
 
         Tipo tipoBase = construirTipo(ctx.tipo());
 
-        /* FIX: Ahora la gramatica soporta multiples dimensiones.
-           Se cuentan los CORCHETE_ABRE para determinar el numero de dimensiones. */
+
         int dimensiones = ctx.CORCHETE_ABRE().size();
 
-        Tipo tipoArreglo = new Tipo(
-                linea(ctx),
-                columna(ctx),
-                tipoBase.getNombre(),
-                true,
-                dimensiones
-        );
+        Tipo tipoArreglo = new Tipo(linea(ctx), columna(ctx), tipoBase.getNombre(), true, dimensiones);
 
         String nombre = ctx.ID().getText();
 
-        /* FIX: Se recorren todos los ENTERO() de la regla para construir
-           la lista de dimensiones (antes solo se tomaba el primero). */
+
         List<Expresion> dimensionesExpr = new ArrayList<>();
 
         for (var entero : ctx.ENTERO()) {
@@ -187,14 +170,7 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
             }
         }
 
-        return new DeclaracionArreglo(
-                linea(ctx),
-                columna(ctx),
-                tipoArreglo,
-                nombre,
-                dimensionesExpr,
-                valores
-        );
+        return new DeclaracionArreglo(linea(ctx), columna(ctx), tipoArreglo, nombre, dimensionesExpr, valores);
     }
 
     private Expresion construirValorArreglo(
@@ -232,22 +208,18 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
         );
     }
 
-    /* =========================================================
-       ======================== TIPOS ==========================
-       ========================================================= */
 
     private Tipo construirTipo(GrammarPigLatinParser.TipoContext ctx) {
 
-        if (ctx == null) {
-            return null;
+        if (ctx == null) return null;
+
+        if (ctx.NOVUS() != null) {
+            return new Tipo(linea(ctx), columna(ctx), ctx.ID().getText(), false, 0);
         }
 
         return new Tipo(linea(ctx), columna(ctx), ctx.getText(), false, 0);
     }
 
-    /* =========================================================
-       ====================== SENTENCIAS =======================
-       ========================================================= */
 
     @Override
     public NodoAST visitAsignacion(GrammarPigLatinParser.AsignacionContext ctx) {
@@ -297,7 +269,7 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
                     columna(condiciones.get(i)),
                     (Expresion) visit(condiciones.get(i)),
                     (Bloque) visit(bloques.get(i)),
-                    null,
+                    new ArrayList<>(),
                     null
             ));
         }
@@ -422,10 +394,6 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
         );
     }
 
-    /* =========================================================
-       ================ ENTRADA / SALIDA =======================
-       ========================================================= */
-
     @Override
     public NodoAST visitImprimir(GrammarPigLatinParser.ImprimirContext ctx) {
 
@@ -471,36 +439,20 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
         );
     }
 
-    /* FIX: Nueva visita para la regla llamadaMetodoSentencia.
-       Convierte una llamada a metodo de objeto en una sentencia.
-       Ej: misObjetos[9].hablar(miObjeto.getNombre()); */
+
     @Override
     public NodoAST visitLlamadaMetodoSentencia(
             GrammarPigLatinParser.LlamadaMetodoSentenciaContext ctx) {
 
-        // Construir el receptor de la llamada (ID acceso*)
-        Expresion receptor = new Identificador(
-                linea(ctx),
-                columna(ctx),
-                ctx.ID().toString()
-        );
+        Expresion receptor = new Identificador(linea(ctx), columna(ctx), ctx.ID(0).getText());
 
-        // Aplicar los accesos previos al .ID final (si hay)
-        // Nota: ctx.acceso() contiene los accesos intermedios, no el .ID final
-        // que ya esta capturado por la regla.
         List<GrammarPigLatinParser.AccesoContext> accesos = ctx.acceso();
         for (GrammarPigLatinParser.AccesoContext acceso : accesos) {
             receptor = aplicarAcceso(receptor, acceso);
         }
 
-        // La llamada al metodo final
-        LlamadaMetodo llamada = new LlamadaMetodo(
-                linea(ctx),
-                columna(ctx),
-                receptor,
-                ctx.ID(ctx.ID().size() - 1).getText(), // ultimo ID = nombre del metodo
-                construirArgumentos(ctx.listaArgumentos())
-        );
+        LlamadaMetodo llamada = new LlamadaMetodo(linea(ctx), columna(ctx), receptor, ctx.ID(ctx.ID().size() - 1).getText(),
+                construirArgumentos(ctx.listaArgumentos()));
 
         return new SentenciaExpresion(linea(ctx), columna(ctx), llamada);
     }
@@ -519,9 +471,6 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
         return visit(ctx.getChild(0));
     }
 
-    /* =========================================================
-       ====================== EXPRESIONES ======================
-       ========================================================= */
 
     @Override
     public NodoAST visitExpresion(GrammarPigLatinParser.ExpresionContext ctx) {
@@ -671,9 +620,7 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
         );
     }
 
-    /* =========================================================
-       ================== ACCESOS ENCADENADOS ==================
-       ========================================================= */
+
 
     private Expresion construirAcceso(
             ParserRuleContext ctx,
@@ -697,8 +644,7 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
         return actual;
     }
 
-    /* FIX: Metodo auxiliar extraido para reutilizarlo en visitLlamadaMetodoSentencia.
-       Aplica un acceso individual a una expresion base. */
+
     private Expresion aplicarAcceso(
             Expresion base,
             GrammarPigLatinParser.AccesoContext acceso) {
@@ -706,7 +652,6 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
         int linea = linea(acceso);
         int columna = columna(acceso);
 
-        // [ expresion ]
         if (acceso.CORCHETE_ABRE() != null) {
 
             List<Expresion> indices = new ArrayList<>();
@@ -715,7 +660,6 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
             return new AccesoArreglo(linea, columna, base, indices);
         }
 
-        // . ID ( args )   -> llamada a metodo
         if (acceso.PARENTESIS_ABRE() != null) {
 
             return new LlamadaMetodo(
@@ -727,13 +671,9 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
             );
         }
 
-        // . ID            -> atributo
         return new AccesoAtributo(linea, columna, base, acceso.ID().getText());
     }
 
-    /* =========================================================
-       ======================== APOYO ==========================
-       ========================================================= */
 
     private Bloque construirBloque(
             ParserRuleContext ctx, List<GrammarPigLatinParser.SentenciaContext> sentencias) {
@@ -793,7 +733,6 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
             return new Literal(linea, columna, false, "bool");
         }
 
-        /* FIX: Manejo explicito de NULL */
         if (ctx.NULL() != null) {
             return new Literal(linea, columna, null, "null");
         }

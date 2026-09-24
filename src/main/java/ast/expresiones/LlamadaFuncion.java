@@ -4,6 +4,7 @@ import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -12,6 +13,7 @@ public class LlamadaFuncion extends Expresion {
 
     private String nombre;
     private List<Expresion> argumentos;
+    private boolean metodoDeClase;
 
     public LlamadaFuncion(int linea, int columna, String nombre, List<Expresion> argumentos) {
         super(linea, columna);
@@ -23,20 +25,39 @@ public class LlamadaFuncion extends Expresion {
     @Override
     public String generarC3D(ContextoC3D contexto) {
 
-        // 1. Evaluar cada argumento y emitir 'param' en orden
-        if (argumentos != null) {
-            for (Expresion arg : argumentos) {
-                String valor = arg.generarC3D(contexto);
-                contexto.agregar("param", valor, null, null);
+        List<String> lugares = new ArrayList<>();
+
+        if (getArgumentos() != null) {
+            for (Expresion argumento : getArgumentos()) {
+                lugares.add(argumento.generarC3D(contexto));
             }
         }
 
-        // 2. Llamar a la función y guardar el resultado en un temporal
-        String temporal = contexto.nuevoTemporal();
-        int cantidadArgs = (argumentos == null) ? 0 : argumentos.size();
+        if (ContextoC3D.esImpresion(getNombre())) {
+            for (String lugar : lugares) {
+                contexto.agregar("print", lugar, null, null);
+            }
+            return null;
+        }
 
-        contexto.agregar("call", nombre, String.valueOf(cantidadArgs), temporal);
+        if (ContextoC3D.esLectura(getNombre())) {
+            String leido = contexto.nuevoTemporal();
+            contexto.agregar("read", null, null, leido);
+            return leido;
+        }
 
-        return temporal;
+        if (metodoDeClase) {                                    // estaVacia() dentro de la clase = this.estaVacia()
+            contexto.agregar("param", "self", null, null);
+        }
+
+        for (String lugar : lugares) {
+            contexto.agregar("param", lugar, null, null);
+        }
+
+        String resultado = contexto.nuevoTemporal();
+        int cantidad = lugares.size() + (metodoDeClase ? 1 : 0);
+
+        contexto.agregar("call", getNombre(), String.valueOf(cantidad), resultado);
+        return resultado;
     }
 }

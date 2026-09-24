@@ -23,37 +23,61 @@ public class InferidorLlamadaMetodo implements InferirTipo<LlamadaMetodo> {
 
         Tipo tipoObjeto = inferirTipoCoordinador.inferir(nodoMetodo.getObjeto(), analisisContexto);
 
-        List<Tipo> tiposArgumentos = new ArrayList<>();
+        List<Expresion> argumentos = nodoMetodo.getArgumentos() == null
+                ? List.of() : nodoMetodo.getArgumentos();
 
-        for (Expresion argumento : nodoMetodo.getArgumentos()) {
-            tiposArgumentos.add(inferirTipoCoordinador.inferir(argumento, analisisContexto));
+        List<Tipo> tiposArgumentos = new ArrayList<>();
+        boolean argumentosValidos = true;
+
+        for (Expresion argumento : argumentos) {
+            Tipo tipo = inferirTipoCoordinador.inferir(argumento, analisisContexto);
+            if (tipo == null) {
+                argumentosValidos = false;
+            }
+            tiposArgumentos.add(tipo);
         }
 
-        if (tipoObjeto == null || tipoObjeto.isArreglo()) {
+        // Si el objeto no tiene tipo, el error ya se reportó al inferirlo: no lo duplicamos
+        if (tipoObjeto == null) {
+            return null;
+        }
 
+        if (tipoObjeto.isArreglo()) {
             analisisContexto.reportarError(nodoMetodo.getLinea(), nodoMetodo.getColumna(),
-                    "No se puede invocar '" + nodoMetodo.getMetodo() + "' sobre " + Tipos.describir(tipoObjeto));
+                    "No se puede invocar '" + nodoMetodo.getMetodo() + "' sobre un arreglo de "
+                            + Tipos.describir(tipoObjeto, analisisContexto));
             return null;
         }
 
         InformeTipo tipoClase = analisisContexto.getTablaTipos().obtener(tipoObjeto.getNombre());
 
-        if (tipoClase == null || !tipoClase.tieneMetodo(nodoMetodo.getMetodo())) {
+        if (tipoClase == null) {
+            analisisContexto.reportarError(nodoMetodo.getLinea(), nodoMetodo.getColumna(),
+                    "'" + tipoObjeto.getNombre() + "' no es una clase declarada (¿falta el import?)");
+            return null;
+        }
 
+        if (!tipoClase.tieneMetodo(nodoMetodo.getMetodo())) {
             analisisContexto.reportarError(nodoMetodo.getLinea(), nodoMetodo.getColumna(),
                     "'" + tipoObjeto.getNombre() + "' no tiene un método '" + nodoMetodo.getMetodo() + "'");
             return null;
         }
 
-        MetodoRecord firma = Tipos.resolverSobrecarga(tipoClase.firmasDe(nodoMetodo.getMetodo()), tiposArgumentos);
+        if (!argumentosValidos) {
+            return null;
+        }
+
+        MetodoRecord firma = Tipos.resolverSobrecarga(tipoClase.firmasDe(nodoMetodo.getMetodo()), tiposArgumentos, analisisContexto);
 
         if (firma == null) {
-
             analisisContexto.reportarError(nodoMetodo.getLinea(), nodoMetodo.getColumna(),
                     "No existe una versión de '" + nodoMetodo.getMetodo() + "' que reciba esos argumentos");
             return null;
         }
 
-        return firma.tipoRetorno();
+        Tipo retorno = firma.tipoRetorno();
+        return retorno != null
+                ? retorno
+                : Tipos.simple(nodoMetodo.getLinea(), nodoMetodo.getColumna(), Tipos.VOID);
     }
 }

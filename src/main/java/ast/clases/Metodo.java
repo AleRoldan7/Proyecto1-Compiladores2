@@ -32,13 +32,15 @@ public class Metodo extends NodoAST {
     @Override
     public String generarC3D(ContextoC3D contexto) {
 
-        // 1. Registrar la función para forward declarations en C
-        contexto.registrarFuncion(nombreMetodo);
+        String clase = contexto.getClaseActual();
+        String nombreFuncion = ContextoC3D.nombreFuncion(clase, nombreMetodo);   // Pila_apilar
 
-        // 2. Etiqueta de inicio de función
-        contexto.agregarEtiqueta("func_" + nombreMetodo);
+        contexto.registrarFuncion(nombreFuncion);
+        contexto.agregarEtiqueta("func_" + nombreFuncion);
 
-        // 3. Declarar parámetros (el generador de C los mapea a argumentos)
+        // El objeto va como primer parámetro (igual que en tu Constructor)
+        contexto.agregar("param_decl", clase, "self", null);
+
         if (parametros != null) {
             for (Parametro p : parametros) {
                 contexto.agregar("param_decl", p.getTipoParametro().getNombre(),
@@ -46,16 +48,13 @@ public class Metodo extends NodoAST {
             }
         }
 
-        // 4. Cuerpo
         cuerpoMetodo.generarC3D(contexto);
 
-        // 5. Return implícito SOLO si es void y no tiene return explícito
         if (esVoid() && !tieneReturnExplicito(cuerpoMetodo)) {
             contexto.agregar("return", null, null, null);
         }
 
-        // 6. Etiqueta de fin de función (útil para el traductor a C)
-        contexto.agregarEtiqueta("end_" + nombreMetodo);
+        contexto.agregarEtiqueta("end_" + nombreFuncion);
 
         return null;
     }

@@ -82,6 +82,30 @@ public class TablaSimbolosView extends BorderPane {
                 f.getTipo() == null || f.getTipo().isBlank() ? "—" : f.getTipo());
         TableColumn<FilaTabla, String> colDetalle = columna("Detalle", f ->
                 f.getDetalle() == null || f.getDetalle().isBlank() ? "—" : f.getDetalle());
+
+        colDetalle.setPrefWidth(350);
+
+        colDetalle.setCellFactory(column -> new TableCell<>() {
+            private final Label label = new Label();
+
+            {
+                label.setWrapText(true);
+                label.setMaxWidth(Double.MAX_VALUE);
+                label.setStyle("-fx-text-fill: " + TEXTO + ";");
+            }
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+
+                if (empty || item == null) {
+                    setGraphic(null);
+                } else {
+                    label.setText(item);
+                    setGraphic(label);
+                }
+            }
+        });
         TableColumn<FilaTabla, String> colAmbito = columna("Ámbito", FilaTabla::getAmbito);
         TableColumn<FilaTabla, String> colLinea = columna("Línea", f -> String.valueOf(f.getLinea()));
         colLinea.setPrefWidth(60);
@@ -121,6 +145,8 @@ public class TablaSimbolosView extends BorderPane {
                         "-fx-table-cell-border-color: " + BORDE + ";" +
                         "-fx-text-fill: " + TEXTO + ";"
         );
+
+        tableView.setFixedCellSize(-1);
     }
 
     private VBox envolver() {

@@ -2,6 +2,7 @@ package semantico;
 
 import ast.tipos.Tipo;
 import enums.TipoArchivo;
+import enums.TipoDato;
 import enums.TipoErrorSemantico;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -140,5 +141,20 @@ public class AnalisisContexto {
 
     public boolean tieneErrores() {
         return errores.stream().anyMatch(e -> e.tipoError() == TipoErrorSemantico.ERROR);
+    }
+
+    /** Convierte un nombre de tipo de CUALQUIER lenguaje (int, numerus...) a su TipoDato; null si es una clase. */
+    public static TipoDato clasificar(String nombre) {
+        if (nombre == null) return null;
+
+        for (TipoArchivo archivo : TipoArchivo.values()) {
+            Dialecto dialecto = Dialectos.de(archivo);
+            for (TipoDato tipoDato : TipoDato.values()) {
+                if (nombre.equals(dialecto.nombrarTipo(tipoDato))) {
+                    return tipoDato;
+                }
+            }
+        }
+        return null;
     }
 }

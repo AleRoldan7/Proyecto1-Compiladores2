@@ -2,6 +2,8 @@ package tablas;
 
 import estructuras.TablaHash;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class TablaTipos {
@@ -29,5 +31,13 @@ public class TablaTipos {
                 this.tipos.put(entry.getKey(), entry.getValue());
             }
         }
+    }
+
+    public List<String> listarNombres() {
+        List<String> nombres = new ArrayList<>();
+        for (var entry : tipos.entradas()) {
+            nombres.add(entry.getKey());
+        }
+        return nombres;
     }
 }

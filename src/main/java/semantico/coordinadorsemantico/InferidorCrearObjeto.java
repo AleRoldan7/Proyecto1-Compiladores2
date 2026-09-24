@@ -21,27 +21,39 @@ public class InferidorCrearObjeto implements InferirTipo<CrearObjeto> {
     @Override
     public Tipo inferir(CrearObjeto nodo, AnalisisContexto contexto) {
 
-        List<Tipo> tiposArgumentos = new ArrayList<>();
+        List<Expresion> argumentos = nodo.getArgumentos() == null
+                ? List.of() : nodo.getArgumentos();
 
-        for (Expresion argumento : nodo.getArgumentos()) {
-            tiposArgumentos.add(inferirTipoCoordinador.inferir(argumento, contexto));
+        List<Tipo> tiposArgumentos = new ArrayList<>();
+        boolean argumentosValidos = true;
+
+        for (Expresion argumento : argumentos) {
+            Tipo tipo = inferirTipoCoordinador.inferir(argumento, contexto);
+            if (tipo == null) {
+                argumentosValidos = false;   // el error ya se reportó
+            }
+            tiposArgumentos.add(tipo);
         }
 
         InformeTipo tipoClase = contexto.getTablaTipos().obtener(nodo.getNombreClase());
 
         if (tipoClase == null) {
-
             contexto.reportarError(nodo.getLinea(), nodo.getColumna(),
-                    "La clase '" + nodo.getNombreClase() + "' no está definida");
+                    "La clase '" + nodo.getNombreClase() + "' no está definida (¿falta el import?)");
             return null;
         }
 
-        MetodoRecord constructor = Tipos.resolverSobrecarga(tipoClase.getConstructores(), tiposArgumentos);
+        List<MetodoRecord> constructores = tipoClase.getConstructores() == null
+                ? List.of() : tipoClase.getConstructores();
 
-        if (constructor == null && !tipoClase.getConstructores().isEmpty()) {
+        if (argumentosValidos && !constructores.isEmpty()) {
 
-            contexto.reportarError(nodo.getLinea(), nodo.getColumna(),
-                    "No existe un constructor de '" + nodo.getNombreClase() + "' que reciba esos argumentos");
+            MetodoRecord constructor = Tipos.resolverSobrecarga(constructores, tiposArgumentos, contexto);
+
+            if (constructor == null) {
+                contexto.reportarError(nodo.getLinea(), nodo.getColumna(),
+                        "No existe un constructor de '" + nodo.getNombreClase() + "' que reciba esos argumentos");
+            }
         }
 
         return Tipos.simple(nodo.getLinea(), nodo.getColumna(), nodo.getNombreClase());

@@ -30,42 +30,35 @@ public class CondicionIf extends NodoAST implements Sentencia {
     @Override
     public String generarC3D(ContextoC3D contexto) {
 
-        String etqVerdadero = contexto.nuevaEtiqueta();
-        String etqFalso     = contexto.nuevaEtiqueta();
-        String etqFin       = contexto.nuevaEtiqueta();
+        String etiquetaFin = contexto.nuevaEtiqueta();
 
-        generarCondicion(condicion, contexto, etqVerdadero, etqFalso);
+        generarRama(contexto, getCondicion(), getBloqueEntonces(), etiquetaFin);            // ADAPTA los getters
 
-        contexto.agregarEtiqueta(etqVerdadero);
-        bloqueEntonces.generarC3D(contexto);
-        contexto.salto(etqFin);
-
-        String etqFalsoActual = etqFalso;
-
-        if (listaSiNoSi != null) {
-            for (CondicionIf c : listaSiNoSi) {
-
-                contexto.agregarEtiqueta(etqFalsoActual);
-
-                String etqV = contexto.nuevaEtiqueta();
-                String etqF = contexto.nuevaEtiqueta();
-
-                generarCondicion(c.getCondicion(), contexto, etqV, etqF);
-
-                contexto.agregarEtiqueta(etqV);
-                c.getBloqueEntonces().generarC3D(contexto);
-                contexto.salto(etqFin);
-
-                etqFalsoActual = etqF;
+        if (getListaSiNoSi() != null) {
+            for (CondicionIf rama : getListaSiNoSi()) {
+                generarRama(contexto, rama.getCondicion(), rama.getBloqueEntonces(), etiquetaFin);
             }
         }
 
-        contexto.agregarEtiqueta(etqFalso);
-        if (bloqueSiNo != null) bloqueSiNo.generarC3D(contexto);
+        if (getBloqueSiNo() != null) {
+            getBloqueSiNo().generarC3D(contexto);
+        }
 
-        contexto.agregarEtiqueta(etqFin);
-
+        contexto.agregarEtiqueta(etiquetaFin);
         return null;
+    }
+
+    private void generarRama(ContextoC3D contexto, Expresion condicion, Bloque bloque, String etiquetaFin) {
+
+        String etiquetaSiguiente = contexto.nuevaEtiqueta();
+
+        String valor = condicion.generarC3D(contexto);
+        contexto.saltoSiFalso(valor, etiquetaSiguiente);
+
+        bloque.generarC3D(contexto);
+        contexto.salto(etiquetaFin);
+
+        contexto.agregarEtiqueta(etiquetaSiguiente);
     }
 
     public static void generarCondicion(Expresion cond, ContextoC3D ctx,

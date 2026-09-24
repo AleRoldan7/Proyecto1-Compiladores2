@@ -17,6 +17,20 @@ public class Identificador extends Expresion {
 
     @Override
     public String generarC3D(ContextoC3D contexto) {
-        return nombreIdentificador;
+
+        String nombre = getNombreIdentificador();
+
+        if ("this".equals(nombre)) {
+            return "self";
+        }
+
+        if (!contexto.esLocal(nombre) && contexto.esAtributo(nombre)) {
+            String temporal = contexto.nuevoTemporal();
+            contexto.agregar("attr_get", "self",
+                    String.valueOf(contexto.desplazamiento(contexto.getClaseActual(), nombre)), temporal);
+            return temporal;
+        }
+
+        return nombre;
     }
 }

@@ -33,16 +33,21 @@ public class ExpresionUnaria extends Expresion {
             case "!":
                 return contexto.unaria("not", operando, TipoDato.BOOLEANO);
 
-            case "++": {
-                String res = contexto.binaria("+", operando, "1", TipoDato.ENTERO);
-                contexto.asignar(operando, res);
-                return operando;
-            }
-
+            case "++":
             case "--": {
-                String res = contexto.binaria("-", operando, "1", TipoDato.ENTERO);
-                contexto.asignar(operando, res);
-                return operando;
+                String simbolo = operador.equals("++") ? "+" : "-";
+                boolean esPrefijo = Boolean.TRUE.equals(prefijo);
+
+                String valorAnterior = null;
+                if (!esPrefijo) {
+                    valorAnterior = contexto.nuevoTemporal();
+                    contexto.asignar(valorAnterior, operando);
+                }
+
+                String nuevo = contexto.binaria(simbolo, operando, "1", TipoDato.ENTERO);
+                Almacenamiento.guardar(expresion, nuevo, contexto);
+
+                return esPrefijo ? nuevo : valorAnterior;
             }
 
             default:

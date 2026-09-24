@@ -36,7 +36,17 @@ public class VisitorZetariano extends GrammarZetarianoBaseVisitor<NodoAST> {
 
     @Override
     public NodoAST visitProgram(GrammarZetarianoParser.ProgramContext ctx) {
-        return visit(ctx.creacionClase());
+        Clase clase = (Clase) visit(ctx.creacionClase());
+
+        return new ast.Programa(
+                clase.getLinea(),
+                clase.getColumna(),
+                new ArrayList<>(),              // importaciones
+                new ArrayList<>(),              // estructuras
+                List.of(clase),                 // clases ← AQUÍ
+                new ArrayList<>(),              // funciones
+                new ArrayList<>()               // declaraciones
+        );
     }
 
     @Override
