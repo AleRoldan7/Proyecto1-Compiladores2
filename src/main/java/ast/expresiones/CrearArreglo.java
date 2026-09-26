@@ -56,7 +56,7 @@ public class CrearArreglo extends Expresion {
         if (valoresIniciales != null) {
             for (int i = 0; i < valoresIniciales.size(); i++) {
                 String valor = valoresIniciales.get(i).generarC3D(contexto);
-                contexto.agregar("index_set", temporal, String.valueOf(i), valor);
+                contexto.agregar("index_set", String.valueOf(i), valor, temporal);
             }
         }
 

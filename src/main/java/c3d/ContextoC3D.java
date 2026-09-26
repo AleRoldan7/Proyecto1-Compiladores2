@@ -1,9 +1,11 @@
 package c3d;
 
 import enums.TipoDato;
+import lombok.Getter;
 
 import java.util.*;
 
+@Getter
 public class ContextoC3D {
 
     private final List<Cuarteta> cuartetas = new ArrayList<>();
@@ -409,16 +411,11 @@ public class ContextoC3D {
                 }
 
             } else if (campo.anchoDeclarado() > 1) {
-                // ---- campo arreglo de primitivos, ej. entero notas[3] ----
-                ancho = campo.anchoDeclarado();
-                embebidoFinal = true;
+                ancho = 1;
+                embebidoFinal = false;
                 tipoAnidadoFinal = null;
 
-                for (int k = 0; k < ancho; k++) {
-                    celdas.put(offset + k, campo.tipo());
-                }
-
-
+                celdas.put(offset, TipoDato.ESTRUCTURA);
             } else {
                 // ---- primitivo simple o referencia a clase (sin cambios) ----
                 celdas.put(offset, campo.tipo());

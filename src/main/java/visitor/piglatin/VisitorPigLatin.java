@@ -138,27 +138,27 @@ public class VisitorPigLatin extends GrammarPigLatinBaseVisitor<NodoAST> {
     }
 
     @Override
-    public NodoAST visitDeclaracionArreglo(GrammarPigLatinParser.DeclaracionArregloContext ctx) {
+    public NodoAST visitDeclaracionArreglo(
+            GrammarPigLatinParser.DeclaracionArregloContext ctx) {
 
         Tipo tipoBase = construirTipo(ctx.tipo());
 
-
         int dimensiones = ctx.CORCHETE_ABRE().size();
 
-        Tipo tipoArreglo = new Tipo(linea(ctx), columna(ctx), tipoBase.getNombre(), true, dimensiones);
+        List<Integer> tamanios = new ArrayList<>();
+
+        for (var entero : ctx.ENTERO()) {
+            tamanios.add(Integer.parseInt(entero.getText()));
+        }
+
+        Tipo tipoArreglo = new Tipo(linea(ctx), columna(ctx), tipoBase.getNombre(), true, dimensiones, tamanios);
 
         String nombre = ctx.ID().getText();
 
-
         List<Expresion> dimensionesExpr = new ArrayList<>();
 
-        for (var entero : ctx.ENTERO()) {
-            dimensionesExpr.add(new Literal(
-                    linea(ctx),
-                    columna(ctx),
-                    Integer.parseInt(entero.getText()),
-                    "numerus"
-            ));
+        for (Integer tamanio : tamanios) {
+            dimensionesExpr.add(new Literal(linea(ctx), columna(ctx), tamanio, "numerus"));
         }
 
         List<Expresion> valores = new ArrayList<>();

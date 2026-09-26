@@ -168,7 +168,8 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
        ========================================================= */
 
     @Override
-    public NodoAST visitDeclaracionEstructura(GrammarPythonParser.DeclaracionEstructuraContext ctx) {
+    public NodoAST visitDeclaracionEstructura(
+            GrammarPythonParser.DeclaracionEstructuraContext ctx) {
 
         List<Campo> campos = new ArrayList<>();
 
@@ -178,31 +179,36 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
 
             if (campo.dimension() != null) {
 
-                int dimensiones = campo.dimension().CORCHETE_ABRE().size();
+                int dimensiones =
+                        campo.dimension().CORCHETE_ABRE().size();
 
-                // FIX: extraer los tamaños constantes
                 List<Integer> tamanos = new ArrayList<>();
+
                 for (var num : campo.dimension().NUMERO_ENTERO()) {
                     tamanos.add(Integer.parseInt(num.getText()));
                 }
 
                 Tipo tipoArreglo = new Tipo(
-                        linea(campo), columna(campo),
+                        linea(campo),
+                        columna(campo),
                         tipo.getNombre(),
                         true,
-                        dimensiones
-
+                        dimensiones,
+                        tamanos
                 );
 
                 campos.add(new Campo(
-                        linea(campo), columna(campo),
+                        linea(campo),
+                        columna(campo),
                         tipoArreglo,
                         campo.ID().getText()
                 ));
 
             } else {
+
                 campos.add(new Campo(
-                        linea(campo), columna(campo),
+                        linea(campo),
+                        columna(campo),
                         tipo,
                         campo.ID().getText()
                 ));
@@ -210,7 +216,8 @@ public class VisitorPiton extends GrammarPythonBaseVisitor<NodoAST> {
         }
 
         return new Estructura(
-                linea(ctx), columna(ctx),
+                linea(ctx),
+                columna(ctx),
                 ctx.ID().getText(),
                 campos
         );

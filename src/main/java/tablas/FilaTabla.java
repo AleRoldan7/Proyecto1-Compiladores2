@@ -16,5 +16,6 @@ public class FilaTabla {
     private final String detalle;
     private final String ambito;
     private final int linea;
+    //private String lenguaje;
 
 }

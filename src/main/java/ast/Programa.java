@@ -63,11 +63,21 @@ public class Programa extends NodoAST {
                                     ? TipoDato.ESTRUCTURA
                                     : convertirTipoDatoDesdeNombre(tipo);
 
+                            int anchoDeclarado = 1;
+
+                            if (campo.getTipo().isArreglo()
+                                    && campo.getTipo().getSize() != null
+                                    && !campo.getTipo().getSize().isEmpty()) {
+
+                                anchoDeclarado = campo.getTipo().getSize().get(0);
+                            }
+
                             return new ContextoC3D.CampoDef(
                                     campo.getNombre(),
                                     esEmbebido,
                                     esEmbebido ? tipo : null,
-                                    tipoDato
+                                    tipoDato,
+                                    anchoDeclarado
                             );
                         })
                         .toList();

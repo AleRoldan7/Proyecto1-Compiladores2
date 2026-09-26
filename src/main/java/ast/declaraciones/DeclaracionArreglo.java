@@ -32,67 +32,205 @@ public class DeclaracionArreglo extends Declaracion {
     @Override
     public String generarC3D(ContextoC3D contexto) {
 
-        // 1. Calcular el tamaño total (producto de las dimensiones)
         String total = "1";
 
         if (dimensiones != null) {
             for (Expresion dim : dimensiones) {
                 if (dim == null) continue;
+
                 String d = dim.generarC3D(contexto);
-                total = contexto.binaria("*", total, d, TipoDato.ENTERO);
+
+                total = contexto.binaria(
+                        "*",
+                        total,
+                        d,
+                        TipoDato.ENTERO
+                );
             }
         }
 
-        // 2. Determinar el tipo base (quitar corchetes si los hay)
         String tipoBase = tipo.getNombre();
+
         if (tipoBase.contains("[")) {
-            tipoBase = tipoBase.substring(0, tipoBase.indexOf("["));
+            tipoBase = tipoBase.substring(
+                    0,
+                    tipoBase.indexOf("[")
+            );
         }
 
-        // 3. Determinar el ancho de cada elemento
-        boolean esEstructura = contexto.esEstructura(tipoBase);
+        boolean esEstructura =
+                contexto.esEstructura(tipoBase);
+
         int anchoElemento = esEstructura
                 ? contexto.tamanioEstructura(tipoBase)
                 : 1;
 
-        // 4. Registrar el tipo base del arreglo en el contexto
-        contexto.registrarTipoBaseArreglo(nombre, tipoBase);
+        contexto.registrarTipoBaseArreglo(
+                nombre,
+                tipoBase
+        );
 
-        // 5. Calcular el total de celdas (numElementos * anchoElemento)
         String totalCeldas = total;
+
         if (anchoElemento != 1) {
-            totalCeldas = contexto.binaria("*", total, String.valueOf(anchoElemento), TipoDato.ENTERO);
+            totalCeldas = contexto.binaria(
+                    "*",
+                    total,
+                    String.valueOf(anchoElemento),
+                    TipoDato.ENTERO
+            );
         }
 
-        // 6. Emitir new_array
-        contexto.agregar("new_array", tipoBase, totalCeldas, nombre);
+        contexto.agregar(
+                "new_array",
+                tipoBase,
+                totalCeldas,
+                nombre
+        );
 
-        // 7. Inicializar con valores si los hay
+        /*
+         * Si es un arreglo de estructuras, cada estructura puede
+         * tener campos que son arreglos.
+         *
+         * Ejemplo:
+         *
+         * Persona:
+         *   nombre
+         *   edad
+         *   notas[3]
+         *
+         * Persona[3]:
+         *   se crean 3 arreglos de notas.
+         */
+        if (esEstructura) {
+
+            List<ContextoC3D.CampoDef> campos =
+                    contexto.getDefinicionesEstructura()
+                            .get(tipoBase);
+
+            if (campos != null) {
+
+                int cantidadElementos = 0;
+
+                if (dimensiones != null
+                        && !dimensiones.isEmpty()
+                        && dimensiones.get(0) instanceof Literal lit
+                        && lit.getValor() instanceof Integer) {
+
+                    cantidadElementos =
+                            (Integer) lit.getValor();
+                }
+
+                for (int i = 0; i < cantidadElementos; i++) {
+
+                    String desplazamiento;
+
+                    if (i == 0) {
+                        desplazamiento = "0";
+                    } else {
+                        desplazamiento = contexto.binaria(
+                                "*",
+                                String.valueOf(i),
+                                String.valueOf(anchoElemento),
+                                TipoDato.ENTERO
+                        );
+                    }
+
+                    String estructura =
+                            contexto.binaria(
+                                    "+",
+                                    nombre,
+                                    desplazamiento,
+                                    TipoDato.ESTRUCTURA
+                            );
+
+                    for (ContextoC3D.CampoDef campo : campos) {
+
+                        if (campo.anchoDeclarado() > 1) {
+
+                            String arregloCampo =
+                                    contexto.nuevoTemporal();
+
+                            contexto.agregar(
+                                    "new_array",
+                                    campo.tipo().name().toLowerCase(),
+                                    String.valueOf(campo.anchoDeclarado()),
+                                    arregloCampo
+                            );
+
+                            ContextoC3D.CampoLayout layout =
+                                    contexto.layoutEstructura(
+                                            tipoBase,
+                                            campo.nombre()
+                                    );
+
+                            contexto.agregar(
+                                    "field_set",
+                                    String.valueOf(layout.offset()),
+                                    arregloCampo,
+                                    estructura
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
         if (valorInicial != null) {
-            for (int i = 0; i < valorInicial.size(); i++) {
-                String valor = valorInicial.get(i).generarC3D(contexto);
 
-                // Si el elemento es una estructura, el offset debe ser i * anchoElemento
-                String offset = String.valueOf(i);
+            for (int i = 0;
+                 i < valorInicial.size();
+                 i++) {
+
+                String valor =
+                        valorInicial.get(i)
+                                .generarC3D(contexto);
+
+                String offset =
+                        String.valueOf(i);
+
                 if (anchoElemento != 1) {
-                    offset = contexto.binaria("*", String.valueOf(i), String.valueOf(anchoElemento), TipoDato.ENTERO);
+
+                    offset = contexto.binaria(
+                            "*",
+                            String.valueOf(i),
+                            String.valueOf(anchoElemento),
+                            TipoDato.ENTERO
+                    );
                 }
 
-                contexto.agregar("index_set", offset, valor, nombre);
+                contexto.agregar(
+                        "index_set",
+                        offset,
+                        valor,
+                        nombre
+                );
             }
         }
 
-        // 8. Registrar tamaños de dimensiones (para arreglos multidimensionales)
-        List<Integer> tamaniosInt = new ArrayList<>();
+        List<Integer> tamaniosInt =
+                new ArrayList<>();
+
         if (dimensiones != null) {
+
             for (Expresion dim : dimensiones) {
-                if (dim instanceof Literal lit && lit.getValor() instanceof Integer) {
-                    tamaniosInt.add((Integer) lit.getValor());
+
+                if (dim instanceof Literal lit
+                        && lit.getValor() instanceof Integer) {
+
+                    tamaniosInt.add(
+                            (Integer) lit.getValor()
+                    );
                 }
             }
         }
+
         if (!tamaniosInt.isEmpty()) {
-            contexto.registrarTamaniosArreglo(nombre, tamaniosInt);
+
+            contexto.registrarTamaniosArreglo(
+                    nombre,
+                    tamaniosInt
+            );
         }
 
         return nombre;

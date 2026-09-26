@@ -9,6 +9,7 @@ public class GenerarCodigoC {
         final String nombre;
         final List<String> parametros = new ArrayList<>();
         final List<Cuarteta> cuerpo = new ArrayList<>();
+        final Set<String> variablesLocales = new TreeSet<>();
         TipoDato tipoRetorno = TipoDato.VOID;
 
         Funcion(String nombre) {
@@ -86,28 +87,36 @@ public class GenerarCodigoC {
         }
 
         Set<String> temporales = new TreeSet<>();
-        Set<String> variables = new TreeSet<>();
 
         for (Funcion f : funciones.values()) {
+
             Set<String> parametrosDeEstaFuncion = new HashSet<>();
+
             for (String p : f.parametros) {
-                parametrosDeEstaFuncion.add(p.substring(p.lastIndexOf(' ') + 1));
+                parametrosDeEstaFuncion.add(
+                        p.substring(p.lastIndexOf(' ') + 1)
+                );
             }
+
             for (Cuarteta q : f.cuerpo) {
-                recolectar(q, temporales, variables, parametrosDeEstaFuncion);
+
+                Set<String> variablesFuncion = new TreeSet<>();
+
+                recolectar(
+                        q,
+                        temporales,
+                        variablesFuncion,
+                        parametrosDeEstaFuncion
+                );
+
+                f.variablesLocales.addAll(variablesFuncion);
             }
         }
 
-        if (main == null) {
-            for (Cuarteta q : inicializacion) {
-                recolectar(q, temporales, variables, Set.of());
-            }
-        }
 
         Map<String, TipoDato> tipos = inferirTiposYRetornos(cuartetas, funciones, nombreCompleto);
 
         StringBuilder sb = new StringBuilder();
-        sb.append("// ★★★ GENERADO CON inferirTiposYRetornos — build de prueba ★★★\n\n");
         sb.append("#include <stdio.h>\n");
         sb.append("#include <stdlib.h>\n");
         sb.append("#include <string.h>\n\n");
@@ -126,11 +135,6 @@ public class GenerarCodigoC {
         sb.append("    return buf;\n");
         sb.append("}\n\n");
 
-        sb.append("// ==== VARIABLES GLOBALES ====\n");
-        for (String v : variables) {
-            System.out.println("VARIABLES: " + v + "Tipos: " + tipos.get(v));
-            sb.append(tipoDe(v, tipos).aTipoC()).append(" ").append(v).append(";\n");
-        }
 
         sb.append("\n// ==== TEMPORALES ====\n");
         for (String t : temporales) {
@@ -153,12 +157,39 @@ public class GenerarCodigoC {
 
             sb.append(f.firma()).append(" {\n");
 
+            for (String variable : f.variablesLocales) {
+
+                TipoDato tipoVariable = tipos.get(variable);
+
+                if (tipoVariable == null
+                        || tipoVariable == TipoDato.DESCONOCIDO) {
+                    tipoVariable = TipoDato.ENTERO;
+                }
+
+                sb.append("    ")
+                        .append(tipoVariable.aTipoC())
+                        .append(" ")
+                        .append(variable)
+                        .append(";\n");
+            }
+
             List<String> pendientes = new ArrayList<>();
 
             for (Cuarteta q : f.cuerpo) {
-                String linea = traducirCuarteta(q, pendientes, funciones, f.tipoRetorno, tipos, nombreCompleto);
+
+                String linea = traducirCuarteta(
+                        q,
+                        pendientes,
+                        funciones,
+                        f.tipoRetorno,
+                        tipos,
+                        nombreCompleto
+                );
+
                 if (!linea.isEmpty()) {
-                    sb.append("    ").append(linea).append("\n");
+                    sb.append("    ")
+                            .append(linea)
+                            .append("\n");
                 }
             }
 

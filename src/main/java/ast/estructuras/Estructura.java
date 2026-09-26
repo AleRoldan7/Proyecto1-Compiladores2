@@ -39,11 +39,21 @@ public class Estructura extends NodoAST {
                     ? TipoDato.ESTRUCTURA
                     : convertirTipoDatoDesdeNombre(tipoCampo);
 
+            int anchoDeclarado = 1;
+
+            if (campo.getTipo().isArreglo()
+                    && campo.getTipo().getSize() != null
+                    && !campo.getTipo().getSize().isEmpty()) {
+
+                anchoDeclarado = campo.getTipo().getSize().get(0);
+            }
+
             defs.add(new ContextoC3D.CampoDef(
                     campo.getNombre(),
                     esEmbebido,
                     esEmbebido ? tipoCampo : null,
-                    tipoDato
+                    tipoDato,
+                    anchoDeclarado
             ));
         }
 
