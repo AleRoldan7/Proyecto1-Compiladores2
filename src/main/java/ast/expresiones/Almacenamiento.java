@@ -3,11 +3,12 @@ package ast.expresiones;
 import c3d.ContextoC3D;
 import enums.TipoDato;
 
+import java.util.List;
+
 public final class Almacenamiento {
 
     private Almacenamiento() {}
 
-    /** Escribe 'valor' en lo que representa 'destino'. */
     public static void guardar(Expresion destino, String valor, ContextoC3D contexto) {
 
         if (destino instanceof AccesoAtributo acceso) {
@@ -36,8 +37,29 @@ public final class Almacenamiento {
             String arreglo = acceso.getArreglo().generarC3D(contexto);
             String indice = acceso.getIndicesArreglo().get(0).generarC3D(contexto);
 
-            int anchoElemento = (acceso.getTipoBaseElemento() != null && contexto.esEstructura(acceso.getTipoBaseElemento()))
+            boolean elementoEsEstructura = acceso.getTipoBaseElemento() != null
+                    && contexto.esEstructura(acceso.getTipoBaseElemento());
+
+            int anchoBase = elementoEsEstructura
                     ? contexto.tamanioEstructura(acceso.getTipoBaseElemento()) : 1;
+
+            // Igual que en AccesoArreglo.generarC3D(): si esta asignación es a
+            // una dimensión intermedia de un arreglo multidimensional de
+            // primitivos (ej. matriz[i][j] = 5, aquí escribiendo el índice j
+            // de la fila i), el paso de 'i' avanza el tamaño de una fila
+            // completa, no de una celda.
+            int anchoElemento = anchoBase;
+            List<Integer> tamanios = AccesoArreglo.tamaniosDeclarados(contexto, acceso.getArreglo());
+            int nivel = AccesoArreglo.nivelDeIndices(acceso.getArreglo());
+
+            if (tamanios != null && nivel < tamanios.size()) {
+                int dimensionesRestantesTrasEste = tamanios.size() - nivel - 1;
+                if (dimensionesRestantesTrasEste > 0) {
+                    for (int d = nivel + 1; d < tamanios.size(); d++) {
+                        anchoElemento *= tamanios.get(d);
+                    }
+                }
+            }
 
             String offset = indice;
             if (anchoElemento != 1) {

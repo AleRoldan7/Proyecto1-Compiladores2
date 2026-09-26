@@ -88,6 +88,12 @@ public class InferidorAccesoArreglo implements InferirTipo<AccesoArreglo> {
 
         String base = Tipos.base(tipoArreglo);
 
+        // FIX: sin esto, tipoBaseElemento queda siempre null y el generador de
+        // C3D (AccesoArreglo/Almacenamiento) nunca puede detectar que el
+        // elemento indexado es una estructura -> arr[i] se trataba como
+        // escalar y dereferenciaba en vez de calcular la dirección.
+        nodoAcceso.setTipoBaseElemento(base);
+
         StringBuilder nombre = new StringBuilder(base);
 
         for (int i = 0; i < dimensionesRestantes; i++) {

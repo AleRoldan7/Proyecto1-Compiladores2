@@ -30,10 +30,10 @@ public class AnalizadorDoWhile implements AnalizadorSemantico<CicloDoWhile> {
 
         Tipo tipoCondicon = inferirTipoCoordinador.inferir(nodoDoWhile.getExpresionDoWhile(), analisisContexto);
 
-        if (!Tipos.esBooleano(tipoCondicon)) {
+        if (!Tipos.esBooleano(tipoCondicon, analisisContexto)) {
 
             analisisContexto.reportarError(nodoDoWhile.getExpresionDoWhile().getLinea(), nodoDoWhile.getExpresionDoWhile().getColumna(),
-                    "La condición del ciclo do-while debe ser boolanea pero se encontro " + Tipos.describir(tipoCondicon));
+                    "La condición del ciclo do-while debe ser boolanea pero se encontro " + Tipos.describir(tipoCondicon, analisisContexto));
         }
     }
 }

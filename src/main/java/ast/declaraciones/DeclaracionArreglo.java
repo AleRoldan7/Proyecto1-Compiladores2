@@ -1,12 +1,14 @@
 package ast.declaraciones;
 
 import ast.expresiones.Expresion;
+import ast.expresiones.Literal;
 import ast.tipos.Tipo;
 import c3d.ContextoC3D;
 import enums.TipoDato;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -41,25 +43,56 @@ public class DeclaracionArreglo extends Declaracion {
             }
         }
 
-        // 2. Reservar en heap: si el tipo base es una estructura, cada elemento
-        //    ocupa varias celdas (su ancho), no una sola.
-        int anchoElemento = contexto.esEstructura(tipo.getNombre())
-                ? contexto.tamanioEstructura(tipo.getNombre())
+        // 2. Determinar el tipo base (quitar corchetes si los hay)
+        String tipoBase = tipo.getNombre();
+        if (tipoBase.contains("[")) {
+            tipoBase = tipoBase.substring(0, tipoBase.indexOf("["));
+        }
+
+        // 3. Determinar el ancho de cada elemento
+        boolean esEstructura = contexto.esEstructura(tipoBase);
+        int anchoElemento = esEstructura
+                ? contexto.tamanioEstructura(tipoBase)
                 : 1;
 
+        // 4. Registrar el tipo base del arreglo en el contexto
+        contexto.registrarTipoBaseArreglo(nombre, tipoBase);
+
+        // 5. Calcular el total de celdas (numElementos * anchoElemento)
         String totalCeldas = total;
         if (anchoElemento != 1) {
             totalCeldas = contexto.binaria("*", total, String.valueOf(anchoElemento), TipoDato.ENTERO);
         }
 
-        contexto.agregar("new_array", tipo.getNombre(), totalCeldas, nombre);
+        // 6. Emitir new_array
+        contexto.agregar("new_array", tipoBase, totalCeldas, nombre);
 
-        // 3. Inicializar con valores si los hay
+        // 7. Inicializar con valores si los hay
         if (valorInicial != null) {
             for (int i = 0; i < valorInicial.size(); i++) {
                 String valor = valorInicial.get(i).generarC3D(contexto);
-                contexto.agregar("index_set", String.valueOf(i), valor, nombre);
+
+                // Si el elemento es una estructura, el offset debe ser i * anchoElemento
+                String offset = String.valueOf(i);
+                if (anchoElemento != 1) {
+                    offset = contexto.binaria("*", String.valueOf(i), String.valueOf(anchoElemento), TipoDato.ENTERO);
+                }
+
+                contexto.agregar("index_set", offset, valor, nombre);
             }
+        }
+
+        // 8. Registrar tamaños de dimensiones (para arreglos multidimensionales)
+        List<Integer> tamaniosInt = new ArrayList<>();
+        if (dimensiones != null) {
+            for (Expresion dim : dimensiones) {
+                if (dim instanceof Literal lit && lit.getValor() instanceof Integer) {
+                    tamaniosInt.add((Integer) lit.getValor());
+                }
+            }
+        }
+        if (!tamaniosInt.isEmpty()) {
+            contexto.registrarTamaniosArreglo(nombre, tamaniosInt);
         }
 
         return nombre;

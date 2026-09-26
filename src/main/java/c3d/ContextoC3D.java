@@ -20,6 +20,7 @@ public class ContextoC3D {
     private final Set<String> nombresEstructuras = new HashSet<>();
     private final Map<String, Map<Integer, TipoDato>> tiposCelda = new HashMap<>();
     private final Map<String, Map<String, TipoDato>> tiposAtributo = new HashMap<>();
+    private final Map<String, List<Integer>> tamaniosArreglo = new HashMap<>();
     // ---------- Temporales y etiquetas ----------
 
     public String nuevoTemporal() {
@@ -286,6 +287,24 @@ public class ContextoC3D {
         return encontrado;
     }
 
+    /**
+     * Registra los tamaños fijos por dimensión de un arreglo declarado (ej.
+     * "entero matriz[3][4]" -> [3, 4]), para que AccesoArreglo pueda calcular
+     * la dirección correcta de un acceso PARCIAL (ej. matriz[i], que debe
+     * devolver la dirección de una fila de 4 celdas, no dereferenciar).
+     * Se llama desde DeclaracionArreglo.generarC3D() cuando los tamaños son
+     * literales conocidos en tiempo de compilación (siempre lo son en esta
+     * gramática: dimension exige NUMERO_ENTERO/ENTERO literal).
+     */
+    public void registrarTamaniosArreglo(String nombreVariable, List<Integer> tamanios) {
+        tamaniosArreglo.put(nombreVariable, tamanios);
+    }
+
+    /** Tamaños por dimensión del arreglo 'nombreVariable', o null si no se conocen. */
+    public List<Integer> tamaniosDeArreglo(String nombreVariable) {
+        return tamaniosArreglo.get(nombreVariable);
+    }
+
     public record CampoLayout(int offset, int ancho, boolean esEmbebido, String tipoAnidado) {}
 
     /** esEmbebido=true cuando el tipo del campo es otra 'estructura' (se aplana); false para primitivos o clases (referencia). */
@@ -390,11 +409,7 @@ public class ContextoC3D {
                 }
 
             } else if (campo.anchoDeclarado() > 1) {
-
-                // ---- NUEVO: campo arreglo de primitivos, ej. entero notas[3] ----
-                // Se aplana en el mismo bloque de la estructura, igual que un
-                // struct embebido: NO es un puntero, así que se marca esEmbebido
-                // para que AccesoAtributo devuelva la dirección sin dereferenciar.
+                // ---- campo arreglo de primitivos, ej. entero notas[3] ----
                 ancho = campo.anchoDeclarado();
                 embebidoFinal = true;
                 tipoAnidadoFinal = null;
@@ -402,6 +417,7 @@ public class ContextoC3D {
                 for (int k = 0; k < ancho; k++) {
                     celdas.put(offset + k, campo.tipo());
                 }
+
 
             } else {
                 // ---- primitivo simple o referencia a clase (sin cambios) ----
@@ -426,5 +442,15 @@ public class ContextoC3D {
     public TipoDato tipoDeCelda(String tipoEstructura, int offsetLocal) {
         return tiposCelda.getOrDefault(tipoEstructura, Map.of())
                 .getOrDefault(offsetLocal, TipoDato.DESCONOCIDO);
+    }
+
+    private final Map<String, String> tipoBaseArreglo = new HashMap<>();
+
+    public void registrarTipoBaseArreglo(String nombreVariable, String tipoBase) {
+        tipoBaseArreglo.put(nombreVariable, tipoBase);
+    }
+
+    public String tipoBaseDeArreglo(String nombreVariable) {
+        return tipoBaseArreglo.get(nombreVariable);
     }
 }

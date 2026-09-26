@@ -27,31 +27,89 @@ public class AccesoArreglo extends Expresion {
         String arr = arreglo.generarC3D(contexto);
         String indice = generarIndiceAplanado(contexto);
 
-        boolean elementoEsEstructura =
-                tipoBaseElemento != null && contexto.esEstructura(tipoBaseElemento);
+        // Si tipoBaseElemento es null, obtenerlo del contexto
+        String tipoBase = tipoBaseElemento;
+        if (tipoBase == null) {
+            Expresion base = arreglo;
+            while (base instanceof AccesoArreglo aa) {
+                base = aa.getArreglo();
+            }
+            if (base instanceof Identificador id) {
+                tipoBase = contexto.tipoBaseDeArreglo(id.getNombreIdentificador());
+            }
+        }
 
-        int anchoElemento = elementoEsEstructura
-                ? contexto.tamanioEstructura(tipoBaseElemento) : 1;
+        boolean elementoEsEstructura =
+                tipoBase != null && contexto.esEstructura(tipoBase);
+
+        int anchoElementoFinal = elementoEsEstructura
+                ? contexto.tamanioEstructura(tipoBase) : 1;
+
+        int nivel = nivelDeIndices(arreglo);
+        List<Integer> tamanios = tamaniosDeclarados(contexto, arreglo);
+
+        boolean quedanDimensiones = false;
+        int anchoElemento = anchoElementoFinal;
+
+        if (tamanios != null && nivel < tamanios.size()) {
+            int dimensionesRestantesTrasEste = tamanios.size() - nivel - 1;
+            if (dimensionesRestantesTrasEste > 0) {
+                quedanDimensiones = true;
+                int ancho = anchoElementoFinal;
+                for (int d = nivel + 1; d < tamanios.size(); d++) {
+                    ancho *= tamanios.get(d);
+                }
+                anchoElemento = ancho;
+            }
+        }
+
+        boolean esCompuesto = elementoEsEstructura || quedanDimensiones;
 
         String offset = indice;
         if (anchoElemento != 1) {
             offset = contexto.binaria("*", indice, String.valueOf(anchoElemento), TipoDato.ENTERO);
         }
 
-        if (elementoEsEstructura) {
-            // El arreglo guarda las estructuras EN LÍNEA (memoria plana):
-            // arr[i] ES la dirección del elemento, no un puntero a él.
-            // Igual que AccesoAtributo con layout.esEmbebido(): devolvemos
-            // la dirección calculada, SIN dereferenciar, para que el
-            // siguiente eslabón de la cadena (.campo u otro [indice]) la use
-            // como base directa.
+        if (esCompuesto) {
             return contexto.binaria("+", arr, offset, TipoDato.ESTRUCTURA);
         }
 
-        // Elemento escalar (entero, cadena, etc.): aquí sí queremos el VALOR.
         String temporal = contexto.nuevoTemporal();
-        contexto.agregar("index_get", arr, offset, temporal, tipoResultado != null ? tipoResultado : TipoDato.ENTERO);
+        contexto.agregar("index_get", arr, offset, temporal);
         return temporal;
+    }
+
+    /**
+     * Cuántos accesos [indice] ya se aplicaron por debajo de 'expr' (0 = expr
+     * es la base). Visibilidad de paquete: también la usa Almacenamiento
+     * para mantener el mismo cálculo de ancho en el camino de escritura.
+     */
+    static int nivelDeIndices(Expresion expr) {
+        if (expr instanceof AccesoArreglo aa) {
+            return 1 + nivelDeIndices(aa.getArreglo());
+        }
+        return 0;
+    }
+
+    /**
+     * Tamaños por dimensión declarados para el arreglo del que cuelga 'expr',
+     * si 'expr' desciende de una variable con tamaño fijo conocido (ver
+     * DeclaracionArreglo.generarC3D / ContextoC3D.registrarTamaniosArreglo).
+     * Devuelve null si la cadena no llega a un identificador simple (ej. es
+     * un campo de estructura) o si esa variable no tiene tamaños registrados.
+     */
+    static List<Integer> tamaniosDeclarados(ContextoC3D contexto, Expresion expr) {
+
+        Expresion base = expr;
+        while (base instanceof AccesoArreglo aa) {
+            base = aa.getArreglo();
+        }
+
+        if (base instanceof Identificador id) {
+            return contexto.tamaniosDeArreglo(id.getNombreIdentificador());
+        }
+
+        return null;
     }
 
     /**

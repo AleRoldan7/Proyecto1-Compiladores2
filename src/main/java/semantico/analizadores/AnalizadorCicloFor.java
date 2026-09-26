@@ -41,8 +41,7 @@ public class AnalizadorCicloFor implements AnalizadorSemantico<CicloFor> {
         }
 
         if (nodoFor.getIncremento() != null) {
-            // Solo para validar que sea una expresión válida (variable
-            // declarada, tipos consistentes, etc.); no se usa el tipo.
+
             inferirTipoCoordinador.inferir(nodoFor.getIncremento(), analisisContexto);
         }
 
