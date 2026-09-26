@@ -10,8 +10,24 @@ public final class Almacenamiento {
     public static void guardar(Expresion destino, String valor, ContextoC3D contexto) {
 
         if (destino instanceof AccesoAtributo acceso) {
-            String objeto = acceso.getObjeto().generarC3D(contexto);            // ADAPTA: getter de la base
-            contexto.agregar("field_set", String.valueOf(acceso.desplazamiento(contexto)), valor, objeto);
+
+            String basePlace = acceso.getBase().generarC3D(contexto);
+
+            if (acceso.isContenedorEsEstructura()) {
+
+                ContextoC3D.CampoLayout layout = contexto.layoutEstructura(acceso.getTipoContenedor(), acceso.getAtributo());
+
+                if (layout.esEmbebido()) {
+                    throw new IllegalStateException("No se puede asignar un struct completo de un solo golpe ('"
+                            + acceso.getAtributo() + "'); asigna campo por campo.");
+                }
+
+                contexto.agregar("field_set", String.valueOf(layout.offset()), valor, basePlace);
+
+            } else {
+                contexto.agregar("field_set",
+                        String.valueOf(contexto.desplazamiento(acceso.getTipoContenedor(), acceso.getAtributo())), valor, basePlace);
+            }
             return;
         }
 

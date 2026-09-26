@@ -14,6 +14,9 @@ public class LlamadaMetodo extends Expresion {
     private String metodo;
     private List<Expresion> argumentos;
 
+    /** Nombre de la clase del receptor, llenado por InferidorLlamadaMetodo durante el análisis semántico. */
+    private String claseReceptor;
+
     public LlamadaMetodo(int linea, int columna, Expresion objeto, String metodo, List<Expresion> argumentos) {
         super(linea, columna);
         this.objeto = objeto;
@@ -24,13 +27,9 @@ public class LlamadaMetodo extends Expresion {
     @Override
     public String generarC3D(ContextoC3D contexto) {
 
-        // 1. Evaluar el objeto (self)
         String obj = objeto.generarC3D(contexto);
-
-        // 2. El objeto se pasa como primer parámetro (self)
         contexto.agregar("param", obj, null, null);
 
-        // 3. Evaluar los argumentos
         if (argumentos != null) {
             for (Expresion arg : argumentos) {
                 String valor = arg.generarC3D(contexto);
@@ -38,11 +37,14 @@ public class LlamadaMetodo extends Expresion {
             }
         }
 
-        // 4. Llamar al método
         String temporal = contexto.nuevoTemporal();
         int cantidadArgs = ((argumentos == null) ? 0 : argumentos.size()) + 1;
 
-        contexto.agregar("call", metodo, String.valueOf(cantidadArgs), temporal);
+        String nombreFuncion = (claseReceptor != null)
+                ? ContextoC3D.nombreFuncion(claseReceptor, metodo)
+                : metodo;   // respaldo: GenerarCodigoC lo resuelve por heurística
+
+        contexto.agregar("call", nombreFuncion, String.valueOf(cantidadArgs), temporal);
 
         return temporal;
     }

@@ -3,6 +3,7 @@ package semantico.coordinadorsemantico;
 import ast.NodoAST;
 import ast.clases.Atributo;
 import ast.clases.Clase;
+import ast.estructuras.InicializacionEstructura;
 import ast.expresiones.*;
 import ast.sentencias.Asignacion;
 import ast.tipos.Tipo;
@@ -34,6 +35,7 @@ public class InferirTipoCoordinador {
         registrar(LlamadaFuncion.class, new InferidorLlamadaFuncion(this));
         registrar(LlamadaMetodo.class, new InferidorLlamadaMetodo(this));
         registrar(CrearObjeto.class, new InferidorCrearObjeto(this));
+        registrar(InicializacionEstructura.class, new InferidorInicializacionEstructura(this));
     }
 
     private <T extends Expresion> void registrar(Class<T> tipo, InferirTipo<T> inferidor) {

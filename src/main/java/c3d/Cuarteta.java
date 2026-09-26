@@ -25,12 +25,6 @@ public class Cuarteta {
     @Override
     public String toString() {
         return switch (operador) {
-
-            /*
-             * FIX: faltaban espacios en casi todos los casos, así que el
-             * C3D salía como "gotoetq0" / "if_falsetmp1gotoetq2" y era
-             * ilegible (y no se podía volver a parsear).
-             */
             case "label"    -> resultado + ":";
             case "goto"     -> "goto " + resultado;
             case "if_true"  -> "if " + arg1 + " goto " + resultado;
@@ -45,24 +39,19 @@ public class Cuarteta {
             case "read"     -> resultado + " = read";
             case "halt"     -> "halt";
 
-            // Unarios: resultado = op arg1   (ej: t1 = - t0, t2 = ! t1)
             case "neg"      -> resultado + " = -" + arg1;
             case "not"      -> resultado + " = !" + arg1;
 
-            // Arreglos: t = base[indice]  /  base[indice] = valor
             case "index_get" -> resultado + " = " + arg1 + "[" + arg2 + "]";
             case "index_set" -> resultado + "[" + arg1 + "] = " + arg2;
 
-            // Heap: reserva de objetos (el enunciado exige heap para objetos)
             case "new"      -> resultado + " = new " + arg1;
-            // Dentro del switch de Cuarteta.toString():
 
             case "param_decl"  -> "param " + arg1 + " " + arg2;
             case "new_array"   -> resultado + " = new " + arg1 + "[" + arg2 + "]";
             case "field_set"   -> resultado + "." + arg1 + " = " + arg2;
             case "attr_get"    -> resultado + " = " + arg1 + "." + arg2;
 
-            // Relacionales
             case "if_<"   -> "if " + arg1 + " < " + arg2 + " goto " + resultado;
             case "if_>"   -> "if " + arg1 + " > " + arg2 + " goto " + resultado;
             case "if_<="  -> "if " + arg1 + " <= " + arg2 + " goto " + resultado;

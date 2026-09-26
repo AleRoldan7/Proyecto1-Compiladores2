@@ -48,7 +48,7 @@ public class DeclaracionArreglo extends Declaracion {
         if (valorInicial != null) {
             for (int i = 0; i < valorInicial.size(); i++) {
                 String valor = valorInicial.get(i).generarC3D(contexto);
-                contexto.agregar("index_set", nombre, String.valueOf(i), valor);
+                contexto.agregar("index_set", String.valueOf(i), valor, nombre);
             }
         }
 

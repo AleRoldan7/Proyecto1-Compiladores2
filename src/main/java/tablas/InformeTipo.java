@@ -20,6 +20,7 @@ public class InformeTipo {
     private final TablaHash<Tipo> atributos = new TablaHash<>();
     private final TablaHash<List<MetodoRecord>> metodos = new TablaHash<>();
     private final List<MetodoRecord> constructores = new ArrayList<>();
+    private final List<String> ordenAtributos = new ArrayList<>();
 
     public InformeTipo(String nombre) {
         this(nombre, TipoDato.DESCONOCIDO);
@@ -33,8 +34,8 @@ public class InformeTipo {
 
     public void agregarAtributo(String nombre, Tipo tipo) {
         atributos.put(nombre, tipo);
+        ordenAtributos.add(nombre);
     }
-
     /*
     public void agregarMetodo(MetodoRecord metodo) {
         metodos.put(metodo.nombre(), metodo);
@@ -70,15 +71,12 @@ public class InformeTipo {
         return metodos.containsKey(nombre);
     }
 
-    /**
-     * Todas las firmas registradas con ese nombre (una sola si no
-     * hay sobrecarga, varias si sí). Lista vacía si el nombre no
-     * existe — nunca null, para que quien llame pueda iterar sin
-     * chequear null primero.
-     */
     public List<MetodoRecord> firmasDe(String nombre) {
         List<MetodoRecord> firmas = metodos.get(nombre);
         return firmas != null ? firmas : Collections.emptyList();
     }
 
+    public List<String> getOrdenAtributos() {
+        return Collections.unmodifiableList(ordenAtributos);
+    }
 }

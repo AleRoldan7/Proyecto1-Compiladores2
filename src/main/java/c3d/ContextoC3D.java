@@ -11,11 +11,14 @@ public class ContextoC3D {
     private final List<String> cadenas = new ArrayList<>();
     private final Map<String, Map<String, Integer>> disposiciones = new HashMap<>();   // clase -> atributo -> desplazamiento
     private final Deque<String[]> destinos = new ArrayDeque<>();                        // {continue, break}; continue = null en un switch
-
+    private final Map<String, List<CampoDef>> definicionesEstructura = new LinkedHashMap<>();
     private int contadorTemporales = 0;
     private int contadorEtiquetas = 0;
     private String claseActual;
-
+    private final Map<String, Map<String, CampoLayout>> layoutsEstructura = new HashMap<>();
+    private final Map<String, Integer> tamaniosEstructura = new HashMap<>();
+    private final Set<String> nombresEstructuras = new HashSet<>();
+    private final Map<String, Map<Integer, TipoDato>> tiposCelda = new HashMap<>();
     // ---------- Temporales y etiquetas ----------
 
     public String nuevoTemporal() {
@@ -28,9 +31,13 @@ public class ContextoC3D {
 
     // ---------- Emisión de cuartetas ----------
 
-    /** (operador, arg1, arg2, resultado) */
     public void agregar(String operador, String arg1, String arg2, String resultado) {
         cuartetas.add(new Cuarteta(operador, arg1, arg2, resultado, null));
+    }
+
+    public void agregar(String operador, String arg1, String arg2,
+                        String resultado, TipoDato tipo) {
+        cuartetas.add(new Cuarteta(operador, arg1, arg2, resultado, tipo));
     }
 
     public void emitir(String operador, String arg1, String arg2, String resultado) {
@@ -125,13 +132,6 @@ public class ContextoC3D {
 
     // ---------- Cadenas ----------
 
-    /**
-     * Devuelve el literal ya listo para C. GenerarCodigoC lo detecta porque empieza
-     * con comillas y lo imprime con %s. Si tu lexer deja comillas sin escapar dentro
-     * del texto, escápalas aquí.
-     */
-
-
     public List<String> getCadenas() {
         return cadenas;
     }
@@ -173,7 +173,7 @@ public class ContextoC3D {
         return claseActual != null && disposicion(claseActual).containsKey(nombre);
     }
 
-    // ---------- break / continue (ciclos y switch comparten la pila) ----------
+    // ---------- break / continue ----------
 
     public void entrarCiclo(String etiquetaContinue, String etiquetaBreak) {
         destinos.push(new String[]{etiquetaContinue, etiquetaBreak});
@@ -264,5 +264,129 @@ public class ContextoC3D {
         }
 
         return encontrado;
+    }
+
+    public record CampoLayout(int offset, int ancho, boolean esEmbebido, String tipoAnidado) {}
+
+    /** esEmbebido=true cuando el tipo del campo es otra 'estructura' (se aplana); false para primitivos o clases (referencia). */
+    public record CampoDef(String nombre, boolean esEmbebido, String tipoAnidado, TipoDato tipo) {}
+
+    public void registrarEstructura(String nombre, List<CampoDef> campos) {
+        nombresEstructuras.add(nombre);
+        definicionesEstructura.put(nombre, campos);
+    }
+
+    public boolean esEstructura(String tipo) {
+        return nombresEstructuras.contains(tipo);
+    }
+
+    public int tamanioEstructura(String tipo) {
+        Integer t = tamaniosEstructura.get(tipo);
+        if (t == null) {
+            throw new IllegalStateException("La estructura '" + tipo + "' no tiene tamaño registrado "
+                    + "(¿se registró antes de usarla? el orden del .y importa)");
+        }
+        return t;
+    }
+
+    public CampoLayout layoutEstructura(String tipo, String campo) {
+        Map<String, CampoLayout> layout = layoutsEstructura.get(tipo);
+        if (layout == null) {
+            throw new IllegalStateException("La estructura '" + tipo + "' no tiene layout registrado");
+        }
+        CampoLayout c = layout.get(campo);
+        if (c == null) {
+            throw new IllegalStateException("La estructura '" + tipo + "' no tiene el campo '" + campo + "'");
+        }
+        return c;
+    }
+
+    public List<String> camposDeEstructura(String tipo) {
+        Map<String, CampoLayout> layout = layoutsEstructura.get(tipo);
+        if (layout == null) {
+            throw new IllegalStateException("La estructura '" + tipo + "' no tiene layout registrado");
+        }
+        return new ArrayList<>(layout.keySet());   // LinkedHashMap: orden de declaración
+    }
+
+    public void resolverEstructuras() {
+
+        for (String nombre : definicionesEstructura.keySet()) {
+            calcularLayoutEstructura(nombre, new HashSet<>());
+        }
+    }
+
+    private void calcularLayoutEstructura(String nombre, Set<String> visitando) {
+
+        if (tamaniosEstructura.containsKey(nombre)) {
+            return;
+        }
+
+        if (!visitando.add(nombre)) {
+            throw new IllegalStateException(
+                    "Referencia circular entre estructuras: " + nombre
+            );
+        }
+
+        List<CampoDef> campos = definicionesEstructura.get(nombre);
+
+        if (campos == null) {
+            throw new IllegalStateException(
+                    "No existe la definición de la estructura '" + nombre + "'"
+            );
+        }
+
+        Map<String, CampoLayout> layout = new LinkedHashMap<>();   // <-- esto faltaba
+        Map<Integer, TipoDato> celdas = new HashMap<>();
+        int offset = 0;
+
+        for (CampoDef campo : campos) {
+
+            int ancho = 1;
+
+            if (campo.esEmbebido()) {
+
+                String tipoAnidado = campo.tipoAnidado();
+
+                if (!definicionesEstructura.containsKey(tipoAnidado)) {
+                    throw new IllegalStateException(
+                            "La estructura '" + nombre
+                                    + "' utiliza la estructura '"
+                                    + tipoAnidado
+                                    + "', pero no existe"
+                    );
+                }
+
+                calcularLayoutEstructura(tipoAnidado, visitando);
+                ancho = tamanioEstructura(tipoAnidado);
+
+                Map<Integer, TipoDato> celdasAnidadas = tiposCelda.get(tipoAnidado);
+                for (int k = 0; k < ancho; k++) {
+                    celdas.put(offset + k, celdasAnidadas.get(k));
+                }
+
+            } else {
+                celdas.put(offset, campo.tipo());
+            }
+
+            layout.put(
+                    campo.nombre(),
+                    new CampoLayout(offset, ancho, campo.esEmbebido(), campo.tipoAnidado())
+            );
+
+            offset += ancho;
+        }
+
+        tiposCelda.put(nombre, celdas);
+        layoutsEstructura.put(nombre, layout);
+        tamaniosEstructura.put(nombre, offset);
+
+        visitando.remove(nombre);
+    }
+
+    /** Tipo real de la celda aplanada en offset local dentro de 'tipoEstructura' (para castear al copiar campos embebidos). */
+    public TipoDato tipoDeCelda(String tipoEstructura, int offsetLocal) {
+        return tiposCelda.getOrDefault(tipoEstructura, Map.of())
+                .getOrDefault(offsetLocal, TipoDato.DESCONOCIDO);
     }
 }

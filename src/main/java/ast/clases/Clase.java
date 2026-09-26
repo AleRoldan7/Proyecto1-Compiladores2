@@ -39,10 +39,15 @@ public class Clase extends NodoAST {
     }
 
     public void registrarDisposicion(ContextoC3D contexto) {
+
         List<String> nombres = new ArrayList<>();
-        for (var atributo : atributos) {                 // ADAPTA: nombre real de la lista de atributos
-            nombres.add(atributo.getNombreAtributo());           // ADAPTA: getter real del nombre
+        for (var atributo : atributos) {                 // ADAPTA
+            nombres.add(atributo.getNombreAtributo());            // ADAPTA
         }
         contexto.registrarClase(nombreClase, nombres);
+
+        if (constructores != null) {                        // ADAPTA: tu campo/getter del constructor
+            contexto.registrarFuncion(ContextoC3D.nombreConstructor(nombreClase));
+        }
     }
 }

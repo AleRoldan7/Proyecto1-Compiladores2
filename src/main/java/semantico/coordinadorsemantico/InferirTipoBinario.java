@@ -30,21 +30,22 @@ public class InferirTipoBinario implements InferirTipo<ExpresionBinaria> {
 
         if (tipoOperador == null) {
             analisisContexto.reportarError(nodoBinario.getLinea(), nodoBinario.getColumna(), "Operador binario no reconocido '" + operacion + "'");
-
             return null;
         }
 
-        return switch (tipoOperador) {
-
+        Tipo resultado = switch (tipoOperador) {
             case ARITMETICO -> inferirAritmetico(nodoBinario, izquierdo, derecho, operacion, analisisContexto);
-
             case RELACIONAL -> inferirRelacional(nodoBinario, izquierdo, derecho, operacion, analisisContexto);
-
-            case LOGICO -> inferirLogico(nodoBinario, izquierdo, derecho, operacion, analisisContexto);
-
-            case IGUALDAD -> inferirIgualdad(nodoBinario, izquierdo, derecho, operacion, analisisContexto);
-
+            case LOGICO     -> inferirLogico(nodoBinario, izquierdo, derecho, operacion, analisisContexto);
+            case IGUALDAD   -> inferirIgualdad(nodoBinario, izquierdo, derecho, operacion, analisisContexto);
         };
+
+        // Guardamos el tipo ya resuelto en el nodo, para que generarC3D no tenga que adivinarlo
+        if (resultado != null) {
+            nodoBinario.setTipoResuelto(Tipos.canonico(resultado, analisisContexto));
+        }
+
+        return resultado;
     }
 
 

@@ -31,9 +31,12 @@ public enum TipoDato {
             case CARACTER -> "char";
             case BOOLEANO -> "int";
             case TEXTO -> "char*";
-            case ESTRUCTURA, OBJETO -> "void*";
+            case ESTRUCTURA, OBJETO -> "uintptr_t";
             case VOID -> "void";
-            case DESCONOCIDO -> throw new IllegalStateException("Un tipo DESCONOCIDO no genera código C");
+            case DESCONOCIDO ->
+                    throw new IllegalStateException(
+                            "Un tipo DESCONOCIDO no genera código C"
+                    );
         };
     }
 }

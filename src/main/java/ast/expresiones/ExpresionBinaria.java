@@ -9,10 +9,12 @@ import lombok.Setter;
 @Setter
 public class ExpresionBinaria extends Expresion {
 
-
     private Expresion izquierda;
     private String operacion;
     private Expresion derecha;
+
+    /** Tipo del RESULTADO ya resuelto por el análisis semántico (InferirTipoBinario). */
+    private TipoDato tipoResuelto;
 
     public ExpresionBinaria(int linea, int columna, Expresion izquierda, String operacion, Expresion derecha) {
         super(linea, columna);
@@ -27,32 +29,40 @@ public class ExpresionBinaria extends Expresion {
         String izq = izquierda.generarC3D(contexto);
         String der = derecha.generarC3D(contexto);
 
-        TipoDato tipo = inferirTipo(izq, der);
-
-        // Relacionales y lógicos devuelven booleano (0/1)
-        if (esRelacional(operacion) || esLogico(operacion)) {
-            tipo = TipoDato.BOOLEANO;
-        }
+        TipoDato tipo = (tipoResuelto != null) ? tipoResuelto : inferirTipoRespaldo(izq, der);
 
         return contexto.binaria(operacion, izq, der, tipo);
     }
 
-    private TipoDato inferirTipo(String izq, String der) {
-        // Si algún operando es decimal, el resultado es decimal
+    /** Solo por si algún ExpresionBinaria se genera sin haber pasado análisis semántico. */
+    private TipoDato inferirTipoRespaldo(String izq, String der) {
+
+        if (esRelacional(operacion) || esLogico(operacion)) {
+            return TipoDato.BOOLEANO;
+        }
+
+        if ("+".equals(operacion) && (esTexto(izq) || esTexto(der))) {
+            return TipoDato.TEXTO;
+        }
+
         if (esDecimal(izq) || esDecimal(der)) {
             return TipoDato.DECIMAL;
         }
+
         return TipoDato.ENTERO;
     }
 
+    private boolean esTexto(String s) {
+        return s != null && s.startsWith("\"");
+    }
+
     private boolean esDecimal(String s) {
-        return s != null && s.contains(".");
+        return s != null && s.matches("-?\\d+\\.\\d+");
     }
 
     private boolean esRelacional(String op) {
-        return op.equals("<") || op.equals(">") ||
-                op.equals("<=") || op.equals(">=") ||
-                op.equals("==") || op.equals("!=");
+        return op.equals("<") || op.equals(">") || op.equals("<=") || op.equals(">=")
+                || op.equals("==") || op.equals("!=");
     }
 
     private boolean esLogico(String op) {
