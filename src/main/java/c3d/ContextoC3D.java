@@ -19,6 +19,7 @@ public class ContextoC3D {
     private final Map<String, Integer> tamaniosEstructura = new HashMap<>();
     private final Set<String> nombresEstructuras = new HashSet<>();
     private final Map<String, Map<Integer, TipoDato>> tiposCelda = new HashMap<>();
+    private final Map<String, Map<String, TipoDato>> tiposAtributo = new HashMap<>();
     // ---------- Temporales y etiquetas ----------
 
     public String nuevoTemporal() {
@@ -139,12 +140,31 @@ public class ContextoC3D {
     // ---------- Objetos en el heap ----------
 
     public void registrarClase(String clase, List<String> atributos) {
+        registrarClase(clase, atributos, null);
+    }
+
+    /** tipos puede ser null (compatibilidad); si no viene, cada atributo queda DESCONOCIDO. */
+    public void registrarClase(String clase, List<String> atributos, List<TipoDato> tipos) {
         Map<String, Integer> mapa = new LinkedHashMap<>();
+        Map<String, TipoDato> tiposMapa = new LinkedHashMap<>();
         int desplazamiento = 0;
-        for (String atributo : atributos) {
+        for (int i = 0; i < atributos.size(); i++) {
+            String atributo = atributos.get(i);
             mapa.put(atributo, desplazamiento++);
+            TipoDato tipo = (tipos != null && i < tipos.size()) ? tipos.get(i) : TipoDato.DESCONOCIDO;
+            tiposMapa.put(atributo, tipo);
         }
         disposiciones.put(clase, mapa);
+        tiposAtributo.put(clase, tiposMapa);
+    }
+
+    /** Tipo declarado del atributo 'atributo' en 'clase' (para tipar attr_get de acceso implícito). */
+    public TipoDato tipoDeAtributo(String clase, String atributo) {
+        Map<String, TipoDato> tiposMapa = tiposAtributo.get(clase);
+        if (tiposMapa == null) {
+            return TipoDato.DESCONOCIDO;
+        }
+        return tiposMapa.getOrDefault(atributo, TipoDato.DESCONOCIDO);
     }
 
     private Map<String, Integer> disposicion(String clase) {
@@ -269,8 +289,11 @@ public class ContextoC3D {
     public record CampoLayout(int offset, int ancho, boolean esEmbebido, String tipoAnidado) {}
 
     /** esEmbebido=true cuando el tipo del campo es otra 'estructura' (se aplana); false para primitivos o clases (referencia). */
-    public record CampoDef(String nombre, boolean esEmbebido, String tipoAnidado, TipoDato tipo) {}
-
+    public record CampoDef(String nombre, boolean esEmbebido, String tipoAnidado, TipoDato tipo, int anchoDeclarado) {
+        public CampoDef(String nombre, boolean esEmbebido, String tipoAnidado, TipoDato tipo) {
+            this(nombre, esEmbebido, tipoAnidado, tipo, 1);
+        }
+    }
     public void registrarEstructura(String nombre, List<CampoDef> campos) {
         nombresEstructuras.add(nombre);
         definicionesEstructura.put(nombre, campos);
@@ -343,17 +366,18 @@ public class ContextoC3D {
         for (CampoDef campo : campos) {
 
             int ancho = 1;
+            boolean embebidoFinal = campo.esEmbebido();
+            String tipoAnidadoFinal = campo.tipoAnidado();
 
-            if (campo.esEmbebido()) {
+            if (campo.esEmbebido() && campo.tipoAnidado() != null) {
 
+                // ---- struct anidada (caso ya existente, sin cambios) ----
                 String tipoAnidado = campo.tipoAnidado();
 
                 if (!definicionesEstructura.containsKey(tipoAnidado)) {
                     throw new IllegalStateException(
-                            "La estructura '" + nombre
-                                    + "' utiliza la estructura '"
-                                    + tipoAnidado
-                                    + "', pero no existe"
+                            "La estructura '" + nombre + "' utiliza la estructura '"
+                                    + tipoAnidado + "', pero no existe"
                     );
                 }
 
@@ -365,18 +389,32 @@ public class ContextoC3D {
                     celdas.put(offset + k, celdasAnidadas.get(k));
                 }
 
+            } else if (campo.anchoDeclarado() > 1) {
+
+                // ---- NUEVO: campo arreglo de primitivos, ej. entero notas[3] ----
+                // Se aplana en el mismo bloque de la estructura, igual que un
+                // struct embebido: NO es un puntero, así que se marca esEmbebido
+                // para que AccesoAtributo devuelva la dirección sin dereferenciar.
+                ancho = campo.anchoDeclarado();
+                embebidoFinal = true;
+                tipoAnidadoFinal = null;
+
+                for (int k = 0; k < ancho; k++) {
+                    celdas.put(offset + k, campo.tipo());
+                }
+
             } else {
+                // ---- primitivo simple o referencia a clase (sin cambios) ----
                 celdas.put(offset, campo.tipo());
             }
 
             layout.put(
                     campo.nombre(),
-                    new CampoLayout(offset, ancho, campo.esEmbebido(), campo.tipoAnidado())
+                    new CampoLayout(offset, ancho, embebidoFinal, tipoAnidadoFinal)
             );
 
-            offset += ancho;
+            offset = offset + ancho;
         }
-
         tiposCelda.put(nombre, celdas);
         layoutsEstructura.put(nombre, layout);
         tamaniosEstructura.put(nombre, offset);

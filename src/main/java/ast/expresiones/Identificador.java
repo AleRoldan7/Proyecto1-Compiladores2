@@ -1,6 +1,7 @@
 package ast.expresiones;
 
 import c3d.ContextoC3D;
+import enums.TipoDato;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -26,8 +27,9 @@ public class Identificador extends Expresion {
 
         if (!contexto.esLocal(nombre) && contexto.esAtributo(nombre)) {
             String temporal = contexto.nuevoTemporal();
+            TipoDato tipo = contexto.tipoDeAtributo(contexto.getClaseActual(), nombre);
             contexto.agregar("attr_get", "self",
-                    String.valueOf(contexto.desplazamiento(contexto.getClaseActual(), nombre)), temporal);
+                    String.valueOf(contexto.desplazamiento(contexto.getClaseActual(), nombre)), temporal, tipo);
             return temporal;
         }
 

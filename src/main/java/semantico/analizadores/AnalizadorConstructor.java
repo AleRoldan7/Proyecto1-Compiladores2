@@ -40,7 +40,7 @@ public class AnalizadorConstructor implements AnalizadorSemantico<Constructor> {
 
             } else {
 
-                analisisContexto.getTablaSimbolos().declarar(parametro.getNombreParametro(), Categoria.PARAMETRO, parametro.getTipoParametro().getNombre(),
+                analisisContexto.getTablaSimbolos().declarar(parametro.getNombreParametro(), Categoria.PARAMETRO, Tipos.describir(parametro.getTipoParametro()),
                         "", nodoConstructor.getLinea());
             }
         }

@@ -42,8 +42,7 @@ public class LlamadaMetodo extends Expresion {
 
         String nombreFuncion = (claseReceptor != null)
                 ? ContextoC3D.nombreFuncion(claseReceptor, metodo)
-                : metodo;   // respaldo: GenerarCodigoC lo resuelve por heurística
-
+                : metodo;
         contexto.agregar("call", nombreFuncion, String.valueOf(cantidadArgs), temporal);
 
         return temporal;

@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 import semantico.AnalisisContexto;
+import semantico.Tipos;
 import semantico.coordinadorsemantico.AnalizadorSemanticoCoordinador;
 import semantico.interfazsemantica.AnalizadorSemantico;
 
@@ -31,7 +32,7 @@ public class AnalizadorMetodo implements AnalizadorSemantico<Metodo> {
 
             } else {
 
-                analisisContexto.getTablaSimbolos().declarar(parametro.getNombreParametro(), Categoria.PARAMETRO, parametro.getTipoParametro().getNombre(),
+                analisisContexto.getTablaSimbolos().declarar(parametro.getNombreParametro(), Categoria.PARAMETRO, Tipos.describir(parametro.getTipoParametro()),
                         "", nodoMetodo.getLinea());
             }
         }

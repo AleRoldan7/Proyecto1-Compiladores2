@@ -1,6 +1,7 @@
 package ast.expresiones;
 
 import c3d.ContextoC3D;
+import enums.TipoDato;
 
 public final class Almacenamiento {
 
@@ -33,8 +34,17 @@ public final class Almacenamiento {
 
         if (destino instanceof AccesoArreglo acceso) {
             String arreglo = acceso.getArreglo().generarC3D(contexto);
-            String indice = acceso.getIndicesArreglo().get(0).generarC3D(contexto);   // 1 dimensión; para N ver generarIndiceAplanado
-            contexto.agregar("index_set", indice, valor, arreglo);
+            String indice = acceso.getIndicesArreglo().get(0).generarC3D(contexto);
+
+            int anchoElemento = (acceso.getTipoBaseElemento() != null && contexto.esEstructura(acceso.getTipoBaseElemento()))
+                    ? contexto.tamanioEstructura(acceso.getTipoBaseElemento()) : 1;
+
+            String offset = indice;
+            if (anchoElemento != 1) {
+                offset = contexto.binaria("*", indice, String.valueOf(anchoElemento), TipoDato.ENTERO);
+            }
+
+            contexto.agregar("index_set", offset, valor, arreglo);
             return;
         }
 

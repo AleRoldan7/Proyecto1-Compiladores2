@@ -88,20 +88,21 @@ public class GenerarCodigoC {
         Set<String> temporales = new TreeSet<>();
         Set<String> variables = new TreeSet<>();
 
-        for (Cuarteta q : cuartetas) {
-            recolectar(q, temporales, variables);
-        }
-
-        // Los parámetros de función no son variables globales — quitarlos.
-        Set<String> nombresParametros = new HashSet<>();
         for (Funcion f : funciones.values()) {
-            for (String parametro : f.parametros) {
-                // parametro tiene forma "int nombre"
-                String nombre = parametro.substring(parametro.lastIndexOf(' ') + 1);
-                nombresParametros.add(nombre);
+            Set<String> parametrosDeEstaFuncion = new HashSet<>();
+            for (String p : f.parametros) {
+                parametrosDeEstaFuncion.add(p.substring(p.lastIndexOf(' ') + 1));
+            }
+            for (Cuarteta q : f.cuerpo) {
+                recolectar(q, temporales, variables, parametrosDeEstaFuncion);
             }
         }
-        variables.removeAll(nombresParametros);
+
+        if (main == null) {
+            for (Cuarteta q : inicializacion) {
+                recolectar(q, temporales, variables, Set.of());
+            }
+        }
 
         Map<String, TipoDato> tipos = inferirTiposYRetornos(cuartetas, funciones, nombreCompleto);
 
@@ -133,8 +134,13 @@ public class GenerarCodigoC {
 
         sb.append("\n// ==== TEMPORALES ====\n");
         for (String t : temporales) {
+            TipoDato tipoT = tipos.get(t);
+            if (tipoT == null || tipoT == TipoDato.DESCONOCIDO) {
+                // Resultado descartado (ej. llamada a método void) — nunca se lee, el tipo es irrelevante.
+                tipoT = TipoDato.ENTERO;
+            }
             System.out.println("TEMPORALES: " + t + "Tipos: " + tipos.get(t));
-            sb.append(tipoDe(t, tipos).aTipoC()).append(" ").append(t).append(";\n");
+            sb.append(tipoT.aTipoC()).append(" ").append(t).append(";\n");
         }
 
         sb.append("\n// ==== FORWARD DECLARATIONS ====\n");
@@ -177,7 +183,8 @@ public class GenerarCodigoC {
        HELPERS
        ========================================================= */
 
-    private static void recolectar(Cuarteta q, Set<String> temporales, Set<String> variables) {
+    private static void recolectar(Cuarteta q, Set<String> temporales, Set<String> variables,
+                                   Set<String> parametrosLocales) {
 
         String[] candidatos = switch (q.getOperador()) {
             case "label", "goto", "halt", "comment", "param_decl" -> new String[0];
@@ -191,6 +198,7 @@ public class GenerarCodigoC {
 
         for (String arg : candidatos) {
             if (arg == null || arg.equals("self")) continue;
+            if (parametrosLocales.contains(arg)) continue;   // parámetro de ESTA función, no va como global
             if (arg.matches("t\\d+")) {
                 temporales.add(arg);
             } else if (arg.matches("[A-Za-z_]\\w*") && !arg.matches("L\\d+")) {

@@ -3,6 +3,7 @@ package ast.expresiones;
 import c3d.ContextoC3D;
 import lombok.Getter;
 import lombok.Setter;
+import semantico.Tipos;
 
 import java.util.List;
 
@@ -25,7 +26,7 @@ public class CrearArreglo extends Expresion {
     @Override
     public String generarC3D(ContextoC3D contexto) {
 
-        // 1. Calcular el tamaño total (producto de las dimensiones)
+        //Calcular el tamaño total
         String total = null;
 
         if (dimensiones != null && !dimensiones.isEmpty()) {
@@ -41,11 +42,17 @@ public class CrearArreglo extends Expresion {
 
         if (total == null) total = "0";
 
-        // 2. Reservar en heap
-        String temporal = contexto.nuevoTemporal();
-        contexto.agregar("new_array", tipoBase, total, temporal);
+        int anchoElemento = contexto.esEstructura(tipoBase) ? contexto.tamanioEstructura(tipoBase) : 1;
 
-        // 3. Inicializar con valores si los hay
+        String totalCeldas = total;
+        if (anchoElemento != 1) {
+            totalCeldas = contexto.binaria("*", total, String.valueOf(anchoElemento), enums.TipoDato.ENTERO);
+        }
+
+        String temporal = contexto.nuevoTemporal();
+        contexto.agregar("new_array", tipoBase, totalCeldas, temporal);
+
+        //Inicializar con valores si los hay
         if (valoresIniciales != null) {
             for (int i = 0; i < valoresIniciales.size(); i++) {
                 String valor = valoresIniciales.get(i).generarC3D(contexto);

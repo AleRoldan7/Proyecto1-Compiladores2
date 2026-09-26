@@ -41,8 +41,18 @@ public class DeclaracionArreglo extends Declaracion {
             }
         }
 
-        // 2. Reservar en heap
-        contexto.agregar("new_array", tipo.getNombre(), total, nombre);
+        // 2. Reservar en heap: si el tipo base es una estructura, cada elemento
+        //    ocupa varias celdas (su ancho), no una sola.
+        int anchoElemento = contexto.esEstructura(tipo.getNombre())
+                ? contexto.tamanioEstructura(tipo.getNombre())
+                : 1;
+
+        String totalCeldas = total;
+        if (anchoElemento != 1) {
+            totalCeldas = contexto.binaria("*", total, String.valueOf(anchoElemento), TipoDato.ENTERO);
+        }
+
+        contexto.agregar("new_array", tipo.getNombre(), totalCeldas, nombre);
 
         // 3. Inicializar con valores si los hay
         if (valorInicial != null) {

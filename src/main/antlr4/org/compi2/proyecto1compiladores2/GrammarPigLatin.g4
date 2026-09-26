@@ -339,7 +339,7 @@ NULL: 'null';
 SECCIONVARIABLE: 'VARIABILES';
 SECCIONMAIN: 'MAIOR';
 
-FINIS: 'finis';
+FINIS: 'finis' | 'FINIS';
 SI: 'si';
 ALITER: 'aliter';
 DUM: 'dum';

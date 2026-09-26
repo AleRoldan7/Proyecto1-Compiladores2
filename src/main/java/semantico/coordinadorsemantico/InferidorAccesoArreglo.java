@@ -71,7 +71,7 @@ public class InferidorAccesoArreglo implements InferirTipo<AccesoArreglo> {
         if (!tipoArreglo.isArreglo()) {
 
             analisisContexto.reportarError(nodoAcceso.getLinea(), nodoAcceso.getColumna(),
-                    "'" + Tipos.describir(tipoArreglo) + "' no es un arreglo, no se puede indexar");
+                    "'" + Tipos.describir(tipoArreglo, analisisContexto) + "' no es un arreglo, no se puede indexar");
 
             return null;
         }
